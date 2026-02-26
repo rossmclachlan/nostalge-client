@@ -26,6 +26,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/artists" replace />} />
           <Route path="/artists" element={<ArtistsPage />} />
+          <Route path="/artists/:id" element={<ArtistsPage />} />
           <Route path="/albums" element={<AlbumsPage />} />
           <Route path="/activity" element={<ActivityPage />} />
         </Routes>
