@@ -68,7 +68,8 @@ export default function ArtistsPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError('Failed to load artists.')
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          setError(`Failed to load artists: ${message}`)
           console.error(err)
         }
       } finally {
