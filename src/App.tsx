@@ -2,6 +2,7 @@ import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { User, Disc3, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ArtistsPage from '@/pages/ArtistsPage'
+import ArtistDetailPage from '@/pages/ArtistDetailPage'
 import AlbumsPage from '@/pages/AlbumsPage'
 import ActivityPage from '@/pages/ActivityPage'
 
@@ -31,7 +32,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/artists" replace />} />
           <Route path="/artists" element={<ArtistsPage />} />
-          <Route path="/artists/:id" element={<ArtistsPage />} />
+          <Route path="/artists/:id" element={<ArtistDetailPage />} />
           <Route path="/albums" element={<AlbumsPage />} />
           <Route path="/activity" element={<ActivityPage />} />
         </Routes>
