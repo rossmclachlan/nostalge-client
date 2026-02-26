@@ -1,7 +1,13 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import pb from '../lib/pocketbase'
-import type { Artist } from '../types/pocketbase'
+import { Search, User } from 'lucide-react'
+import pb from '@/lib/pocketbase'
+import type { Artist } from '@/types/pocketbase'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const PER_PAGE = 50
 
@@ -9,35 +15,46 @@ function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
 }
 
+function ArtistCardSkeleton() {
+  return (
+    <Card className="gap-0 overflow-hidden border-border/50 p-0">
+      <Skeleton className="aspect-square w-full rounded-none" />
+      <div className="space-y-2 p-3">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    </Card>
+  )
+}
+
 function ArtistCard({ artist }: { artist: Artist }) {
   const [imgError, setImgError] = useState(false)
 
   return (
-    <Link
-      to={`/artists/${artist.id}`}
-      className="bg-surface-light rounded-lg overflow-hidden hover:bg-surface-lighter transition-colors group"
-    >
-      <div className="aspect-square bg-surface-lighter overflow-hidden">
-        {artist.image_url && !imgError ? (
-          <img
-            src={artist.image_url}
-            alt={artist.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={() => setImgError(true)}
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-text-muted">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-        )}
-      </div>
-      <div className="p-3">
-        <h3 className="font-semibold truncate">{artist.name}</h3>
-        <p className="text-sm text-text-muted">{formatPlays(artist.play_count)}</p>
-      </div>
+    <Link to={`/artists/${artist.id}`}>
+      <Card className="group gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+        <div className="aspect-square overflow-hidden bg-accent">
+          {artist.image_url && !imgError ? (
+            <img
+              src={artist.image_url}
+              alt={artist.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <User className="h-12 w-12" strokeWidth={1.5} />
+            </div>
+          )}
+        </div>
+        <div className="p-3">
+          <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
+          <Badge variant="secondary" className="mt-1.5 font-normal">
+            {formatPlays(artist.play_count)}
+          </Badge>
+        </div>
+      </Card>
     </Link>
   )
 }
@@ -107,48 +124,48 @@ export default function ArtistsPage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Artists</h1>
+      <h1 className="mb-4 text-2xl font-bold">Artists</h1>
 
       <div className="relative mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
           type="text"
           placeholder="Search artists..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-surface-light border border-surface-lighter rounded-lg py-2.5 pl-10 pr-4 text-text placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+          className="h-10 bg-card pl-9"
         />
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-2 border-surface-lighter border-t-primary rounded-full animate-spin" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <ArtistCardSkeleton key={i} />
+          ))}
         </div>
       ) : error ? (
-        <p className="text-center py-12 text-red-400">{error}</p>
+        <p className="py-12 text-center text-destructive">{error}</p>
       ) : filtered.length === 0 ? (
-        <p className="text-center py-12 text-text-muted">
+        <p className="py-12 text-center text-muted-foreground">
           {search ? 'No artists match your search.' : 'No artists found.'}
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {filtered.map(artist => (
               <ArtistCard key={artist.id} artist={artist} />
             ))}
           </div>
 
           {hasMore && !search && (
-            <div className="flex justify-center mt-6 mb-4">
-              <button
+            <div className="mb-4 mt-6 flex justify-center">
+              <Button
+                variant="outline"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="bg-surface-light hover:bg-surface-lighter border border-surface-lighter rounded-lg px-6 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {loadingMore ? 'Loading...' : 'Load more'}
-              </button>
+              </Button>
             </div>
           )}
         </>
