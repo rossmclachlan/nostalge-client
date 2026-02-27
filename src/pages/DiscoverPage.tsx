@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   Calendar,
   Tag as TagIcon,
@@ -80,6 +80,34 @@ function CopyButton({ text }: { text: string }) {
 
 const SCROLL_ROW =
   'flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+
+function ScrollRow({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className="relative">
+      <div className={SCROLL_ROW + (className ? ' ' + className : '')}>
+        {children}
+      </div>
+      <div className="pointer-events-none absolute bottom-2 right-0 top-0 w-8 bg-gradient-to-r from-transparent to-background" />
+    </div>
+  )
+}
+
+function EmptyState({
+  icon: Icon,
+  message,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
+  message: string
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/50 py-8">
+      <Icon className="mb-2 h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
+      <p className="max-w-xs text-center text-sm text-muted-foreground">
+        {message}
+      </p>
+    </div>
+  )
+}
 
 /* ── Mini cards for horizontal scroll rows ── */
 
@@ -297,7 +325,7 @@ function OnThisDaySection() {
           <Calendar className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">On This Day</h2>
         </div>
-        <div className={SCROLL_ROW}>
+        <ScrollRow>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="w-36 shrink-0">
               <Skeleton className="aspect-square w-full rounded-lg" />
@@ -305,28 +333,29 @@ function OnThisDaySection() {
               <Skeleton className="mt-1 h-3 w-1/2" />
             </div>
           ))}
-        </div>
+        </ScrollRow>
       </section>
     )
   }
 
   return (
-    <section className="mb-8">
+    <section className="section-fade-in mb-8">
       <div className="mb-3 flex items-center gap-2">
         <Calendar className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">On This Day</h2>
       </div>
       {groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No listening history for this date.
-        </p>
+        <EmptyState
+          icon={Calendar}
+          message="No scrobbles on this date in previous years. This section fills up as your listening history grows!"
+        />
       ) : (
         groups.map(({ year, scrobbles }) => (
           <div key={year} className="mb-4">
             <h3 className="mb-2 text-sm font-medium text-muted-foreground">
               {year}
             </h3>
-            <div className={SCROLL_ROW}>
+            <ScrollRow>
               {scrobbles.map(scrobble => {
                 const track = scrobble.expand?.track
                 const artist = track?.expand?.artist
@@ -341,7 +370,7 @@ function OnThisDaySection() {
                   />
                 )
               })}
-            </div>
+            </ScrollRow>
           </div>
         ))
       )}
@@ -417,7 +446,7 @@ function GenreDiveSection() {
           <Skeleton className="h-6 w-48" />
         </div>
         <Skeleton className="mb-2 h-4 w-16" />
-        <div className={SCROLL_ROW}>
+        <ScrollRow>
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="w-36 shrink-0">
               <Skeleton className="aspect-square w-full rounded-lg" />
@@ -425,15 +454,28 @@ function GenreDiveSection() {
               <Skeleton className="mt-1 h-3 w-12" />
             </div>
           ))}
-        </div>
+        </ScrollRow>
       </section>
     )
   }
 
-  if (!tag) return null
+  if (!tag) {
+    return (
+      <section className="section-fade-in mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <TagIcon className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Today&apos;s Genre</h2>
+        </div>
+        <EmptyState
+          icon={TagIcon}
+          message="No genre tags found yet. Tags appear as your library grows."
+        />
+      </section>
+    )
+  }
 
   return (
-    <section className="mb-8">
+    <section className="section-fade-in mb-8">
       <div className="mb-3 flex items-center gap-2">
         <TagIcon className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Today&apos;s Genre:</h2>
@@ -445,22 +487,22 @@ function GenreDiveSection() {
       {artists.length > 0 && (
         <>
           <p className="mb-2 text-sm text-muted-foreground">Artists</p>
-          <div className={SCROLL_ROW + ' mb-4'}>
+          <ScrollRow className="mb-4">
             {artists.map(artist => (
               <MiniArtistCard key={artist.id} artist={artist} />
             ))}
-          </div>
+          </ScrollRow>
         </>
       )}
 
       {albums.length > 0 && (
         <>
           <p className="mb-2 text-sm text-muted-foreground">Albums</p>
-          <div className={SCROLL_ROW}>
+          <ScrollRow>
             {albums.map(album => (
               <MiniAlbumCard key={album.id} album={album} />
             ))}
-          </div>
+          </ScrollRow>
         </>
       )}
     </section>
@@ -520,7 +562,7 @@ function DeepCutsSection() {
         <p className="mb-3 text-sm text-muted-foreground">
           Albums you liked but might have forgotten
         </p>
-        <div className={SCROLL_ROW}>
+        <ScrollRow>
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="w-40 shrink-0">
               <Card className="gap-0 overflow-hidden border-border/50 p-0">
@@ -533,15 +575,31 @@ function DeepCutsSection() {
               </Card>
             </div>
           ))}
-        </div>
+        </ScrollRow>
       </section>
     )
   }
 
-  if (albums.length === 0) return null
+  if (albums.length === 0) {
+    return (
+      <section className="section-fade-in mb-8">
+        <div className="mb-1 flex items-center gap-2">
+          <Disc3 className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Deep Cuts</h2>
+        </div>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Albums you liked but might have forgotten
+        </p>
+        <EmptyState
+          icon={Disc3}
+          message="Not enough albums in your library yet to surface deep cuts."
+        />
+      </section>
+    )
+  }
 
   return (
-    <section className="mb-8">
+    <section className="section-fade-in mb-8">
       <div className="mb-1 flex items-center gap-2">
         <Disc3 className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Deep Cuts</h2>
@@ -549,11 +607,11 @@ function DeepCutsSection() {
       <p className="mb-3 text-sm text-muted-foreground">
         Albums you liked but might have forgotten
       </p>
-      <div className={SCROLL_ROW}>
+      <ScrollRow>
         {albums.map(album => (
           <MiniAlbumCard key={album.id} album={album} showCopy />
         ))}
-      </div>
+      </ScrollRow>
     </section>
   )
 }
@@ -609,7 +667,7 @@ function ForgottenFavoritesSection() {
         <p className="mb-3 text-sm text-muted-foreground">
           Artists you haven&apos;t played lately
         </p>
-        <div className={SCROLL_ROW}>
+        <ScrollRow>
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="w-36 shrink-0">
               <Skeleton className="aspect-square w-full rounded-lg" />
@@ -617,15 +675,31 @@ function ForgottenFavoritesSection() {
               <Skeleton className="mt-1 h-3 w-12" />
             </div>
           ))}
-        </div>
+        </ScrollRow>
       </section>
     )
   }
 
-  if (artists.length === 0) return null
+  if (artists.length === 0) {
+    return (
+      <section className="section-fade-in mb-8">
+        <div className="mb-1 flex items-center gap-2">
+          <Heart className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Forgotten Favorites</h2>
+        </div>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Artists you haven&apos;t played lately
+        </p>
+        <EmptyState
+          icon={Heart}
+          message="Keep scrobbling! We'll surface artists you haven't played in a while."
+        />
+      </section>
+    )
+  }
 
   return (
-    <section className="mb-8">
+    <section className="section-fade-in mb-8">
       <div className="mb-1 flex items-center gap-2">
         <Heart className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Forgotten Favorites</h2>
@@ -633,11 +707,11 @@ function ForgottenFavoritesSection() {
       <p className="mb-3 text-sm text-muted-foreground">
         Artists you haven&apos;t played lately
       </p>
-      <div className={SCROLL_ROW}>
+      <ScrollRow>
         {artists.map(artist => (
           <MiniArtistCard key={artist.id} artist={artist} />
         ))}
-      </div>
+      </ScrollRow>
     </section>
   )
 }
@@ -712,14 +786,27 @@ function RandomAlbumSection() {
     )
   }
 
-  if (!album) return null
+  if (!album) {
+    return (
+      <section className="section-fade-in mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <Shuffle className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Spin the Wheel</h2>
+        </div>
+        <EmptyState
+          icon={Shuffle}
+          message="No albums in your library yet to spin."
+        />
+      </section>
+    )
+  }
 
   const artist = album.expand?.artist
   const tags = album.expand?.tag_relations ?? []
   const copyText = `${artist?.name ?? 'Unknown artist'} - ${album.title}`
 
   return (
-    <section className="mb-8">
+    <section className="section-fade-in mb-8">
       <div className="mb-3 flex items-center gap-2">
         <Shuffle className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Spin the Wheel</h2>
@@ -797,6 +884,8 @@ function formatTodayHeader(): string {
 }
 
 export default function DiscoverPage() {
+  const location = useLocation()
+
   return (
     <div className="p-4">
       <div className="mb-6">
@@ -804,11 +893,11 @@ export default function DiscoverPage() {
         <p className="text-muted-foreground">{formatTodayHeader()}</p>
       </div>
 
-      <OnThisDaySection />
-      <GenreDiveSection />
-      <DeepCutsSection />
-      <ForgottenFavoritesSection />
-      <RandomAlbumSection />
+      <OnThisDaySection key={'otd-' + location.key} />
+      <GenreDiveSection key={'gd-' + location.key} />
+      <DeepCutsSection key={'dc-' + location.key} />
+      <ForgottenFavoritesSection key={'ff-' + location.key} />
+      <RandomAlbumSection key={'ra-' + location.key} />
     </div>
   )
 }
