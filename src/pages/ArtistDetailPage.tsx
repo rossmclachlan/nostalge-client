@@ -194,10 +194,12 @@ export default function ArtistDetailPage() {
   const [similarMap, setSimilarMap] = useState<Record<string, Artist>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [heroImgError, setHeroImgError] = useState(false)
 
   const fetchData = useCallback(async (artistId: string) => {
     setLoading(true)
     setError(null)
+    setHeroImgError(false)
     try {
       const [artistRecord, albumsResult] = await Promise.all([
         pb.collection('artists').getOne<ArtistWithTags>(artistId, { expand: 'tag_relations', requestKey: null }),
@@ -278,37 +280,61 @@ export default function ArtistDetailPage() {
         <p className="py-12 text-center text-destructive">{error}</p>
       ) : artist ? (
         <div className="space-y-6">
-          {/* Hero section — typography-driven */}
-          <div className="text-center">
-            <h2 className="text-3xl font-bold">{artist.name}</h2>
-            <div className="mt-3 flex justify-center gap-2">
-              <Badge>{formatPlays(artist.play_count)}</Badge>
-              {artist.listener_count > 0 && (
-                <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
-              )}
-            </div>
-            {(() => {
-              const expandedTags = artist.expand?.tag_relations ?? []
-              const fallbackTags = expandedTags.length === 0 ? (artist.tags ?? []) : []
-              if (expandedTags.length === 0 && fallbackTags.length === 0) return null
-              return (
-                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                  {expandedTags.map(tag => (
-                    <Link key={tag.id} to={`/tags/${tag.id}`}>
-                      <Badge variant="outline" className="text-xs font-normal transition-colors hover:bg-accent hover:text-primary">
-                        {tag.name}
-                      </Badge>
-                    </Link>
-                  ))}
-                  {fallbackTags.map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs font-normal">
-                      {tag}
-                    </Badge>
-                  ))}
+          {/* Hero section */}
+          {artist.image_url && !heroImgError ? (
+            <div className="relative h-[250px] overflow-hidden rounded-xl md:h-[350px]">
+              <img
+                src={artist.image_url}
+                alt={artist.name}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                onError={() => setHeroImgError(true)}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <h2 className="text-3xl font-bold drop-shadow-lg">{artist.name}</h2>
+                <div className="mt-2 flex gap-2">
+                  <Badge>{formatPlays(artist.play_count)}</Badge>
+                  {artist.listener_count > 0 && (
+                    <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
+                  )}
                 </div>
-              )
-            })()}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center">
+              <h2 className="text-3xl font-bold">{artist.name}</h2>
+              <div className="mt-3 flex justify-center gap-2">
+                <Badge>{formatPlays(artist.play_count)}</Badge>
+                {artist.listener_count > 0 && (
+                  <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tags */}
+          {(() => {
+            const expandedTags = artist.expand?.tag_relations ?? []
+            const fallbackTags = expandedTags.length === 0 ? (artist.tags ?? []) : []
+            if (expandedTags.length === 0 && fallbackTags.length === 0) return null
+            return (
+              <div className="-mt-3 flex flex-wrap justify-center gap-1.5">
+                {expandedTags.map(tag => (
+                  <Link key={tag.id} to={`/tags/${tag.id}`}>
+                    <Badge variant="outline" className="text-xs font-normal transition-colors hover:bg-accent hover:text-primary">
+                      {tag.name}
+                    </Badge>
+                  </Link>
+                ))}
+                {fallbackTags.map(tag => (
+                  <Badge key={tag} variant="outline" className="text-xs font-normal">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )
+          })()}
 
           {/* Bio */}
           {artist.bio && <BioSection bio={artist.bio} />}

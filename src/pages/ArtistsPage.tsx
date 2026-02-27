@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import pb from '@/lib/pocketbase'
@@ -17,10 +17,23 @@ function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
 }
 
+function getInitials(name: string): string {
+  return name.split(/\s+/).slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase()
+}
+
+function getGradientForName(name: string): string {
+  let hash = 0
+  for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash)
+  const hue1 = Math.abs(hash % 360)
+  const hue2 = (hue1 + 40) % 360
+  return `linear-gradient(135deg, hsl(${hue1}, 50%, 30%), hsl(${hue2}, 50%, 20%))`
+}
+
 function ArtistCardSkeleton() {
   return (
-    <Card className="border-border/50 px-4 py-3">
-      <div className="space-y-2">
+    <Card className="overflow-hidden border-border/50 p-0">
+      <Skeleton className="aspect-square w-full rounded-none" />
+      <div className="space-y-2 px-4 py-3">
         <Skeleton className="h-5 w-3/4" />
         <div className="flex gap-1.5">
           <Skeleton className="h-5 w-16" />
@@ -33,31 +46,54 @@ function ArtistCardSkeleton() {
 
 function ArtistCard({ artist }: { artist: ArtistWithTags }) {
   const navigate = useNavigate()
+  const [imgError, setImgError] = useState(false)
   const expandedTags = (artist.expand?.tag_relations ?? []).slice(0, 3)
   const fallbackTags = expandedTags.length === 0 ? (artist.tags?.slice(0, 3) ?? []) : []
 
+  const handleImgError = useCallback(() => setImgError(true), [])
+
   return (
     <Card
-      className="cursor-pointer border-border/50 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-accent"
+      className="group cursor-pointer overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent"
       onClick={() => navigate(`/artists/${artist.id}`)}
     >
-      <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <Badge variant="secondary" className="font-normal">
-          {formatPlays(artist.play_count)}
-        </Badge>
-        {expandedTags.map(tag => (
-          <Link key={tag.id} to={`/tags/${tag.id}`} onClick={e => e.stopPropagation()}>
-            <Badge variant="outline" className="text-xs font-normal text-muted-foreground transition-colors hover:text-primary">
-              {tag.name}
-            </Badge>
-          </Link>
-        ))}
-        {fallbackTags.map(tag => (
-          <Badge key={tag} variant="outline" className="text-xs font-normal text-muted-foreground">
-            {tag}
+      <div className="aspect-square overflow-hidden bg-accent">
+        {artist.image_url && !imgError ? (
+          <img
+            src={artist.image_url}
+            alt={artist.name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            onError={handleImgError}
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center text-2xl font-bold text-white/80"
+            style={{ background: getGradientForName(artist.name) }}
+          >
+            {getInitials(artist.name)}
+          </div>
+        )}
+      </div>
+      <div className="px-4 py-3">
+        <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="font-normal">
+            {formatPlays(artist.play_count)}
           </Badge>
-        ))}
+          {expandedTags.map(tag => (
+            <Link key={tag.id} to={`/tags/${tag.id}`} onClick={e => e.stopPropagation()}>
+              <Badge variant="outline" className="text-xs font-normal text-muted-foreground transition-colors hover:text-primary">
+                {tag.name}
+              </Badge>
+            </Link>
+          ))}
+          {fallbackTags.map(tag => (
+            <Badge key={tag} variant="outline" className="text-xs font-normal text-muted-foreground">
+              {tag}
+            </Badge>
+          ))}
+        </div>
       </div>
     </Card>
   )
