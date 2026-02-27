@@ -38,3 +38,8 @@ export interface Scrobble extends RecordModel {
   track: string
   scrobbled_at: string
 }
+
+export interface Tag extends RecordModel {
+  name: string
+  usage_count: number
+}
