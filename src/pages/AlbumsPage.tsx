@@ -159,7 +159,7 @@ export default function AlbumsPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <AlbumCardSkeleton key={i} />
           ))}
@@ -172,7 +172,7 @@ export default function AlbumsPage() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {filtered.map(album => (
               <AlbumCard key={album.id} album={album} />
             ))}

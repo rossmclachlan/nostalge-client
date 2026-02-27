@@ -213,6 +213,7 @@ export default function AlbumDetailPage() {
                   alt={album.title}
                   className="h-full w-full object-cover"
                   onError={() => setHeroImgError(true)}
+                  loading="lazy"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-muted-foreground">
