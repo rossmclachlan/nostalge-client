@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Disc3 } from 'lucide-react'
+import { Search, Disc3, Copy, Check } from 'lucide-react'
 import pb from '@/lib/pocketbase'
 import type { Album, Artist } from '@/types/pocketbase'
 import { Card } from '@/components/ui/card'
@@ -30,12 +30,40 @@ function AlbumCardSkeleton() {
   )
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="absolute right-1.5 top-1.5 h-7 w-7 bg-background/70 opacity-100 backdrop-blur-sm transition-opacity md:opacity-0 md:group-hover:opacity-100"
+      onClick={handleCopy}
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-primary" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+    </Button>
+  )
+}
+
 function AlbumCard({ album }: { album: AlbumWithArtist }) {
   const [imgError, setImgError] = useState(false)
   const artist = album.expand?.artist
+  const copyText = `${artist?.name ?? 'Unknown artist'} - ${album.title}`
 
   return (
-    <Card className="group gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+    <Card className="group relative gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
       <Link to={`/albums/${album.id}`}>
         <div className="aspect-square overflow-hidden bg-accent">
           {album.image_url && !imgError ? (
@@ -53,6 +81,7 @@ function AlbumCard({ album }: { album: AlbumWithArtist }) {
           )}
         </div>
       </Link>
+      <CopyButton text={copyText} />
       <div className="p-3">
         <Link to={`/albums/${album.id}`}>
           <h3 className="truncate font-semibold text-card-foreground">{album.title}</h3>
