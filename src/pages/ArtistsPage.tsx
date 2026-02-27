@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, User } from 'lucide-react'
+import { Search } from 'lucide-react'
 import pb from '@/lib/pocketbase'
 import type { Artist } from '@/types/pocketbase'
 import { Card } from '@/components/ui/card'
@@ -17,42 +17,34 @@ function formatPlays(count: number): string {
 
 function ArtistCardSkeleton() {
   return (
-    <Card className="gap-0 overflow-hidden border-border/50 p-0">
-      <Skeleton className="aspect-square w-full rounded-none" />
-      <div className="space-y-2 p-3">
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-3 w-1/2" />
+    <Card className="border-border/50 px-4 py-3">
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-3/4" />
+        <div className="flex gap-1.5">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-12" />
+        </div>
       </div>
     </Card>
   )
 }
 
 function ArtistCard({ artist }: { artist: Artist }) {
-  const [imgError, setImgError] = useState(false)
+  const tags = artist.tags?.slice(0, 3) ?? []
 
   return (
     <Link to={`/artists/${artist.id}`}>
-      <Card className="group gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
-        <div className="aspect-square overflow-hidden bg-accent">
-          {artist.image_url && !imgError ? (
-            <img
-              src={artist.image_url}
-              alt={artist.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              onError={() => setImgError(true)}
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <User className="h-12 w-12" strokeWidth={1.5} />
-            </div>
-          )}
-        </div>
-        <div className="p-3">
-          <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
-          <Badge variant="secondary" className="mt-1.5 font-normal">
+      <Card className="border-border/50 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-accent">
+        <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="font-normal">
             {formatPlays(artist.play_count)}
           </Badge>
+          {tags.map(tag => (
+            <Badge key={tag} variant="outline" className="text-xs font-normal text-muted-foreground">
+              {tag}
+            </Badge>
+          ))}
         </div>
       </Card>
     </Link>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, User, Disc3 } from 'lucide-react'
+import { ArrowLeft, Disc3 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import pb from '@/lib/pocketbase'
 import type { Artist, Album } from '@/types/pocketbase'
@@ -8,10 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 
 function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
+}
+
+function formatListeners(count: number): string {
+  return count.toLocaleString() + ' listeners'
 }
 
 function parseSimilarArtistName(entry: unknown): string | null {
@@ -26,16 +29,16 @@ function parseSimilarArtistName(entry: unknown): string | null {
 
 function HeroSkeleton() {
   return (
-    <div className="space-y-4">
-      <Skeleton className="mx-auto aspect-square w-48 rounded-xl" />
-      <div className="space-y-2 text-center">
-        <Skeleton className="mx-auto h-8 w-48" />
-        <Skeleton className="mx-auto h-5 w-24" />
-        <div className="flex justify-center gap-2">
-          <Skeleton className="h-5 w-14" />
-          <Skeleton className="h-5 w-14" />
-          <Skeleton className="h-5 w-14" />
-        </div>
+    <div className="space-y-3 text-center">
+      <Skeleton className="mx-auto h-9 w-56" />
+      <div className="flex justify-center gap-2">
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-5 w-24" />
+      </div>
+      <div className="flex justify-center gap-1.5">
+        <Skeleton className="h-5 w-14" />
+        <Skeleton className="h-5 w-14" />
+        <Skeleton className="h-5 w-14" />
       </div>
     </div>
   )
@@ -71,11 +74,10 @@ function AlbumGridSkeleton() {
 
 function SimilarArtistsSkeleton() {
   return (
-    <div className="flex gap-4 overflow-hidden">
+    <div className="flex gap-3 overflow-hidden">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex shrink-0 flex-col items-center gap-2">
-          <Skeleton className="h-16 w-16 rounded-full" />
-          <Skeleton className="h-3 w-14" />
+        <div key={i} className="shrink-0">
+          <Skeleton className="h-5 w-20 rounded-full" />
         </div>
       ))}
     </div>
@@ -160,39 +162,23 @@ function AlbumCard({ album }: { album: Album }) {
   )
 }
 
-// --- Similar artist avatar ---
+// --- Similar artist pill ---
 
-function SimilarArtistAvatar({ name, artist }: { name: string; artist?: Artist }) {
-  const [imgError, setImgError] = useState(false)
-
-  const content = (
-    <div className="flex w-18 shrink-0 flex-col items-center gap-2">
-      <Avatar className="h-16 w-16">
-        {artist?.image_url && !imgError ? (
-          <AvatarImage
-            src={artist.image_url}
-            alt={name}
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <AvatarFallback>
-            <User className="h-6 w-6" />
-          </AvatarFallback>
-        )}
-      </Avatar>
-      <span className="w-full truncate text-center text-xs text-muted-foreground">{name}</span>
-    </div>
-  )
-
+function SimilarArtistPill({ name, artist }: { name: string; artist?: Artist }) {
   if (artist) {
     return (
-      <Link to={`/artists/${artist.id}`} className="transition-opacity hover:opacity-80">
-        {content}
+      <Link to={`/artists/${artist.id}`}>
+        <Badge variant="secondary" className="font-normal transition-colors hover:bg-accent hover:text-primary">
+          {name}
+        </Badge>
       </Link>
     )
   }
-
-  return content
+  return (
+    <Badge variant="secondary" className="font-normal">
+      {name}
+    </Badge>
+  )
 }
 
 // --- Main page ---
@@ -206,12 +192,10 @@ export default function ArtistDetailPage() {
   const [similarMap, setSimilarMap] = useState<Record<string, Artist>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [heroImgError, setHeroImgError] = useState(false)
 
   const fetchData = useCallback(async (artistId: string) => {
     setLoading(true)
     setError(null)
-    setHeroImgError(false)
     try {
       const [artistRecord, albumsResult] = await Promise.all([
         pb.collection('artists').getOne<Artist>(artistId, { requestKey: null }),
@@ -292,36 +276,24 @@ export default function ArtistDetailPage() {
         <p className="py-12 text-center text-destructive">{error}</p>
       ) : artist ? (
         <div className="space-y-6">
-          {/* Hero section */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-48 w-48 overflow-hidden rounded-xl bg-accent">
-              {artist.image_url && !heroImgError ? (
-                <img
-                  src={artist.image_url}
-                  alt={artist.name}
-                  className="h-full w-full object-cover"
-                  onError={() => setHeroImgError(true)}
-                  loading="lazy"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                  <User className="h-16 w-16" strokeWidth={1.5} />
-                </div>
+          {/* Hero section — typography-driven */}
+          <div className="text-center">
+            <h2 className="text-3xl font-bold">{artist.name}</h2>
+            <div className="mt-3 flex justify-center gap-2">
+              <Badge>{formatPlays(artist.play_count)}</Badge>
+              {artist.listener_count > 0 && (
+                <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
               )}
             </div>
-            <div className="text-center">
-              <h2 className="text-3xl font-bold">{artist.name}</h2>
-              <Badge className="mt-2">{formatPlays(artist.play_count)}</Badge>
-              {artist.tags?.length > 0 && (
-                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                  {artist.tags.map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs font-normal">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
+            {artist.tags?.length > 0 && (
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                {artist.tags.map(tag => (
+                  <Badge key={tag} variant="outline" className="text-xs font-normal">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Bio */}
@@ -347,9 +319,9 @@ export default function ArtistDetailPage() {
             return names.length > 0 ? (
               <div>
                 <h2 className="mb-3 text-lg font-semibold">Similar Artists</h2>
-                <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2">
+                <div className="flex flex-wrap gap-2">
                   {names.map(name => (
-                    <SimilarArtistAvatar
+                    <SimilarArtistPill
                       key={name}
                       name={name}
                       artist={similarMap[name]}
