@@ -22,8 +22,8 @@ npm install
 
 Create a `.env` file pointing to your PocketBase instance. Replace the IP with your server's local IP address:
 
-```
-VITE_POCKETBASE_URL=http://192.168.86.141:8090
+```bash
+echo 'VITE_POCKETBASE_URL=http://192.168.86.141:8095' > .env
 ```
 
 To find your server's IP, run `hostname -I` on the machine running PocketBase.
@@ -35,7 +35,7 @@ Before starting the client, confirm PocketBase is reachable and has data.
 ### 1. Health check
 
 ```bash
-curl http://192.168.86.141:8090/api/health
+curl http://192.168.86.141:8095/api/health
 ```
 
 You should get back:
@@ -44,37 +44,59 @@ You should get back:
 {"code":200,"message":"API is healthy."}
 ```
 
-If this fails, check that port `8090` is mapped in your `docker-compose.yml`:
+If this fails, check that port `8095` is mapped in your `docker-compose.yml`:
 
 ```yaml
 pocketbase:
   ports:
-    - "8090:8090"
+    - "8095:8090"
 ```
 
-Then restart your containers with `docker compose up -d`.
+Then restart your containers with `sudo docker compose up -d`.
 
-### 2. Check collections have data
+### 2. Enable public read access
+
+The PWA reads data without authentication, so all collections need public read rules. SSH into your server and run:
+
+```bash
+cd /volume1/docker/music-cms
+export $(grep -v '^#' .env | xargs)
+
+TOKEN=$(curl -s -X POST http://localhost:8095/api/admins/auth-with-password \
+  -H "Content-Type: application/json" \
+  -d '{"identity":"'"$POCKETBASE_ADMIN_EMAIL"'","password":"'"$POCKETBASE_ADMIN_PASSWORD"'"}' | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+for col in artists albums tracks scrobbles sync_jobs; do
+  curl -s -X PATCH "http://localhost:8095/api/collections/$col" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"listRule":"","viewRule":""}' > /dev/null
+  echo "$col: public read enabled"
+done
+```
+
+### 3. Check collections have data
 
 ```bash
 # Artists (should return paginated results)
-curl -s "http://192.168.86.141:8090/api/collections/artists/records?perPage=1" | python3 -m json.tool
+curl -s "http://192.168.86.141:8095/api/collections/artists/records?perPage=1" | python3 -m json.tool
 
 # Albums
-curl -s "http://192.168.86.141:8090/api/collections/albums/records?perPage=1" | python3 -m json.tool
+curl -s "http://192.168.86.141:8095/api/collections/albums/records?perPage=1" | python3 -m json.tool
 
 # Tracks
-curl -s "http://192.168.86.141:8090/api/collections/tracks/records?perPage=1" | python3 -m json.tool
+curl -s "http://192.168.86.141:8095/api/collections/tracks/records?perPage=1" | python3 -m json.tool
 ```
 
 Each response should include a `totalItems` count and at least one record in the `items` array. If you get a 403 error, public read access hasn't been enabled — see the backend repo for the setup script.
 
-### 3. Check CORS
+### 4. Check CORS
 
 Open a browser console on any page and run:
 
 ```javascript
-fetch('http://192.168.86.141:8090/api/health')
+fetch('http://192.168.86.141:8095/api/health')
   .then(r => r.json())
   .then(console.log)
   .catch(console.error)
@@ -111,9 +133,10 @@ Once the dev server is running:
 | Problem | Fix |
 |---|---|
 | Blank page, no data | Open browser DevTools → Network tab. Check for failed requests to your PocketBase URL. Verify `.env` has the correct IP. |
-| `ERR_CONNECTION_REFUSED` | PocketBase isn't running or port 8090 isn't exposed. Run `docker compose ps` to check container status. |
+| `ERR_CONNECTION_REFUSED` | PocketBase isn't running or port 8095 isn't exposed. Run `sudo docker compose ps` to check container status. |
 | `ERR_NAME_NOT_RESOLVED` | You're using a hostname that can't be resolved. Use the IP address directly. |
 | Data loads but images are broken | Album/artist images come from Last.fm CDN. Check your network connection. Missing images will show a placeholder. |
+| 403 "Only admins can perform this action" | Public read access not enabled. Run the public read script in step 2 above. |
 | CORS errors in console | Shouldn't happen with default PocketBase config. Check that you're using `http://` not `https://` for local connections. |
 
 ## Building for production
