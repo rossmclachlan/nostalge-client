@@ -32,7 +32,8 @@ export interface OnThisDayGroup {
 
 /**
  * Fetch scrobbles where scrobbled_at matches the given month+day from any
- * previous year, expanding track/artist/album relations. Returns grouped by year.
+ * previous year, expanding track/artist/album relations. Returns the top 2-3
+ * years (by scrobble count) grouped by year.
  */
 export async function fetchOnThisDay(
   pb: PocketBase,
@@ -43,10 +44,25 @@ export async function fetchOnThisDay(
   const dd = String(day).padStart(2, '0')
   const currentYear = new Date().getFullYear()
 
-  // PocketBase date filter: match month and day portions across all years
-  // scrobbled_at is an ISO string like "2024-02-27 14:30:00.000Z"
+  // Build explicit date range filters for each previous year.
+  // PocketBase's ~ (contains) operator isn't reliable on datetime fields,
+  // so we use exact >= / < range comparisons instead.
+  const yearFilters: string[] = []
+  for (let year = currentYear - 1; year >= currentYear - 10; year--) {
+    const startDate = `${year}-${mm}-${dd} 00:00:00`
+    // Compute the next day to form an exclusive upper bound
+    const nextDay = new Date(year, month - 1, Number(dd) + 1)
+    const ny = nextDay.getFullYear()
+    const nm = String(nextDay.getMonth() + 1).padStart(2, '0')
+    const nd = String(nextDay.getDate()).padStart(2, '0')
+    const endDate = `${ny}-${nm}-${nd} 00:00:00`
+    yearFilters.push(`(scrobbled_at >= '${startDate}' && scrobbled_at < '${endDate}')`)
+  }
+
+  const filter = yearFilters.join(' || ')
+
   const result = await pb.collection('scrobbles').getFullList<ScrobbleExpanded>({
-    filter: `scrobbled_at ~ "-${mm}-${dd}" && scrobbled_at < "${currentYear}-01-01"`,
+    filter,
     sort: '-scrobbled_at',
     expand: 'track,track.artist,track.album',
     requestKey: null,
@@ -62,7 +78,10 @@ export async function fetchOnThisDay(
     groups.get(year)!.push(scrobble)
   }
 
+  // Return top 3 years by scrobble count, then sorted most recent first
   return Array.from(groups.entries())
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 3)
     .sort((a, b) => b[0] - a[0])
     .map(([year, scrobbles]) => ({ year, scrobbles }))
 }
