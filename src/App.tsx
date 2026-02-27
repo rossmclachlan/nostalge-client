@@ -34,6 +34,7 @@ export default function App() {
           <Route path="/artists" element={<ArtistsPage />} />
           <Route path="/artists/:id" element={<ArtistDetailPage />} />
           <Route path="/albums" element={<AlbumsPage />} />
+          <Route path="/albums/:id" element={<AlbumsPage />} />
           <Route path="/activity" element={<ActivityPage />} />
         </Routes>
       </main>
