@@ -14,6 +14,14 @@ function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
 }
 
+function parseSimilarArtistName(entry: unknown): string | null {
+  if (typeof entry === 'string') return entry
+  if (entry && typeof entry === 'object' && 'name' in entry && typeof (entry as { name: unknown }).name === 'string') {
+    return (entry as { name: string }).name
+  }
+  return null
+}
+
 // --- Skeleton loaders ---
 
 function HeroSkeleton() {
@@ -206,10 +214,11 @@ export default function ArtistDetailPage() {
     setHeroImgError(false)
     try {
       const [artistRecord, albumsResult] = await Promise.all([
-        pb.collection('artists').getOne<Artist>(artistId),
+        pb.collection('artists').getOne<Artist>(artistId, { requestKey: null }),
         pb.collection('albums').getFullList<Album>({
           filter: `artist = "${artistId}"`,
           sort: '-play_count',
+          requestKey: null,
         }),
       ])
 
@@ -217,12 +226,15 @@ export default function ArtistDetailPage() {
       setAlbums(albumsResult)
 
       // Resolve similar artists — look up by name
-      if (artistRecord.similar_artists?.length) {
-        const names = artistRecord.similar_artists
+      const names = (artistRecord.similar_artists ?? [])
+        .map(parseSimilarArtistName)
+        .filter((n): n is string => n !== null)
+      if (names.length) {
         const filterExpr = names.map(n => `name = "${n.replace(/"/g, '\\"')}"`).join(' || ')
         try {
           const similar = await pb.collection('artists').getFullList<Artist>({
             filter: filterExpr,
+            requestKey: null,
           })
           const map: Record<string, Artist> = {}
           for (const a of similar) {
@@ -327,20 +339,25 @@ export default function ArtistDetailPage() {
           )}
 
           {/* Similar artists */}
-          {artist.similar_artists?.length > 0 && (
-            <div>
-              <h2 className="mb-3 text-lg font-semibold">Similar Artists</h2>
-              <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2">
-                {artist.similar_artists.map(name => (
-                  <SimilarArtistAvatar
-                    key={name}
-                    name={name}
-                    artist={similarMap[name]}
-                  />
-                ))}
+          {(() => {
+            const names = (artist.similar_artists ?? [])
+              .map(parseSimilarArtistName)
+              .filter((n): n is string => n !== null)
+            return names.length > 0 ? (
+              <div>
+                <h2 className="mb-3 text-lg font-semibold">Similar Artists</h2>
+                <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2">
+                  {names.map(name => (
+                    <SimilarArtistAvatar
+                      key={name}
+                      name={name}
+                      artist={similarMap[name]}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null
+          })()}
         </div>
       ) : null}
     </div>
