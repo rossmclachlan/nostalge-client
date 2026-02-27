@@ -211,51 +211,19 @@ function MiniArtistCard({ artist }: { artist: Artist }) {
   )
 }
 
-/* ── Section: On This Day ── */
+/* ── Section: On This Day (albums) ── */
 
-function ScrobbleCard({
-  trackTitle,
-  artistName,
-  imageUrl,
-  albumId,
-}: {
-  trackTitle: string
+type OnThisDayAlbum = {
+  id: string
+  title: string
+  image_url?: string
   artistName: string
-  imageUrl?: string
-  albumId?: string
-}) {
-  const [imgError, setImgError] = useState(false)
-  const content = (
-    <div className="w-36 shrink-0">
-      <div className="aspect-square overflow-hidden rounded-lg bg-accent">
-        {imageUrl && !imgError ? (
-          <img
-            src={imageUrl}
-            alt={trackTitle}
-            className="h-full w-full object-cover"
-            onError={() => setImgError(true)}
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <Disc3 className="h-8 w-8" strokeWidth={1.5} />
-          </div>
-        )}
-      </div>
-      <p className="mt-1.5 truncate text-sm font-medium">{trackTitle}</p>
-      <p className="truncate text-xs text-muted-foreground">{artistName}</p>
-    </div>
-  )
-
-  if (albumId) {
-    return <Link to={`/albums/${albumId}`}>{content}</Link>
-  }
-  return content
+  artistId?: string
 }
 
 function OnThisDaySection() {
   const [groups, setGroups] = useState<
-    { year: number; scrobbles: ScrobbleExpanded[] }[]
+    { year: number; albums: OnThisDayAlbum[] }[]
   >([])
   const [loading, setLoading] = useState(true)
 
@@ -292,7 +260,7 @@ function OnThisDaySection() {
 
         if (cancelled) return
 
-        // Group by year
+        // Group scrobbles by year, counting per year
         const byYear = new Map<number, ScrobbleExpanded[]>()
         for (const s of result) {
           const year = new Date(s.scrobbled_at).getFullYear()
@@ -300,11 +268,34 @@ function OnThisDaySection() {
           byYear.get(year)!.push(s)
         }
 
-        setGroups(
-          Array.from(byYear.entries())
-            .sort((a, b) => b[0] - a[0])
-            .map(([year, scrobbles]) => ({ year, scrobbles })),
-        )
+        // Pick the 2-3 years with the most scrobbles
+        const sortedYears = Array.from(byYear.entries())
+          .sort((a, b) => b[1].length - a[1].length)
+          .slice(0, 3)
+          .sort((a, b) => b[0] - a[0]) // then order by year descending for display
+
+        // For each year, group scrobbles by album and deduplicate
+        const yearGroups = sortedYears.map(([year, scrobbles]) => {
+          const seen = new Set<string>()
+          const albums: OnThisDayAlbum[] = []
+          for (const s of scrobbles) {
+            const track = s.expand?.track
+            const album = track?.expand?.album
+            if (!album || seen.has(album.id)) continue
+            seen.add(album.id)
+            const artist = track?.expand?.artist
+            albums.push({
+              id: album.id,
+              title: album.title,
+              image_url: album.image_url,
+              artistName: artist?.name ?? 'Unknown artist',
+              artistId: artist?.id,
+            })
+          }
+          return { year, albums }
+        }).filter(g => g.albums.length > 0)
+
+        setGroups(yearGroups)
       } catch (err) {
         console.error('On This Day fetch failed:', err)
       } finally {
@@ -327,10 +318,14 @@ function OnThisDaySection() {
         </div>
         <ScrollRow>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="w-36 shrink-0">
-              <Skeleton className="aspect-square w-full rounded-lg" />
-              <Skeleton className="mt-2 h-3 w-3/4" />
-              <Skeleton className="mt-1 h-3 w-1/2" />
+            <div key={i} className="w-40 shrink-0">
+              <Card className="gap-0 overflow-hidden border-border/50 p-0">
+                <Skeleton className="aspect-square w-full rounded-none" />
+                <div className="space-y-2 p-2.5">
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </Card>
             </div>
           ))}
         </ScrollRow>
@@ -350,31 +345,67 @@ function OnThisDaySection() {
           message="No scrobbles on this date in previous years. This section fills up as your listening history grows!"
         />
       ) : (
-        groups.map(({ year, scrobbles }) => (
+        groups.map(({ year, albums }) => (
           <div key={year} className="mb-4">
             <h3 className="mb-2 text-sm font-medium text-muted-foreground">
               {year}
             </h3>
             <ScrollRow>
-              {scrobbles.map(scrobble => {
-                const track = scrobble.expand?.track
-                const artist = track?.expand?.artist
-                const album = track?.expand?.album
-                return (
-                  <ScrobbleCard
-                    key={scrobble.id}
-                    trackTitle={track?.title ?? 'Unknown track'}
-                    artistName={artist?.name ?? 'Unknown artist'}
-                    imageUrl={album?.image_url}
-                    albumId={album?.id}
-                  />
-                )
-              })}
+              {albums.map(album => (
+                <OnThisDayAlbumCard key={album.id} album={album} />
+              ))}
             </ScrollRow>
           </div>
         ))
       )}
     </section>
+  )
+}
+
+function OnThisDayAlbumCard({ album }: { album: OnThisDayAlbum }) {
+  const [imgError, setImgError] = useState(false)
+
+  return (
+    <div className="w-40 shrink-0">
+      <Card className="group relative gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+        <Link to={`/albums/${album.id}`}>
+          <div className="aspect-square overflow-hidden bg-accent">
+            {album.image_url && !imgError ? (
+              <img
+                src={album.image_url}
+                alt={album.title}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                onError={() => setImgError(true)}
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <Disc3 className="h-8 w-8" strokeWidth={1.5} />
+              </div>
+            )}
+          </div>
+        </Link>
+        <div className="p-2.5">
+          <Link to={`/albums/${album.id}`}>
+            <h3 className="truncate text-sm font-semibold text-card-foreground">
+              {album.title}
+            </h3>
+          </Link>
+          {album.artistId ? (
+            <Link
+              to={`/artists/${album.artistId}`}
+              className="mt-0.5 block truncate text-xs text-muted-foreground transition-colors hover:text-primary"
+            >
+              {album.artistName}
+            </Link>
+          ) : (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {album.artistName}
+            </p>
+          )}
+        </div>
+      </Card>
+    </div>
   )
 }
 
@@ -716,55 +747,102 @@ function ForgottenFavoritesSection() {
   )
 }
 
-/* ── Section: Random Album (Spin the Wheel) ── */
+/* ── Section: Featured Albums (was "Spin the Wheel") ── */
 
-function RandomAlbumSection() {
-  const navigate = useNavigate()
-  const [album, setAlbum] = useState<AlbumWithArtist | null>(null)
-  const [loading, setLoading] = useState(true)
+function FeaturedAlbumCard({ album }: { album: AlbumWithArtist }) {
   const [imgError, setImgError] = useState(false)
+  const artist = album.expand?.artist
+  const copyText = `${artist?.name ?? 'Unknown artist'} - ${album.title}`
 
-  const fetchRandom = useCallback(async (seed: number) => {
-    try {
-      setLoading(true)
-      setImgError(false)
+  return (
+    <div className="w-[200px] shrink-0 md:w-[250px]">
+      <Card className="group relative gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+        <Link to={`/albums/${album.id}`}>
+          <div className="aspect-square overflow-hidden bg-accent">
+            {album.image_url && !imgError ? (
+              <img
+                src={album.image_url}
+                alt={album.title}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                onError={() => setImgError(true)}
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <Disc3 className="h-10 w-10" strokeWidth={1.5} />
+              </div>
+            )}
+          </div>
+        </Link>
+        <CopyButton text={copyText} />
+        <div className="p-3">
+          <Link to={`/albums/${album.id}`}>
+            <h3 className="truncate text-sm font-semibold text-card-foreground">
+              {album.title}
+            </h3>
+          </Link>
+          {artist ? (
+            <Link
+              to={`/artists/${artist.id}`}
+              className="mt-0.5 block truncate text-xs text-muted-foreground transition-colors hover:text-primary"
+            >
+              {artist.name}
+            </Link>
+          ) : (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              Unknown artist
+            </p>
+          )}
+          <Badge variant="secondary" className="mt-1.5 text-xs font-normal">
+            {formatPlays(album.play_count)}
+          </Badge>
+        </div>
+      </Card>
+    </div>
+  )
+}
 
-      // Get total count
-      const countResult = await pb
-        .collection('albums')
-        .getList<AlbumWithArtist>(1, 1, { requestKey: null })
-      const total = countResult.totalItems
+function FeaturedAlbumsSection() {
+  const [albums, setAlbums] = useState<AlbumWithArtist[]>([])
+  const [pool, setPool] = useState<AlbumWithArtist[]>([])
+  const [loading, setLoading] = useState(true)
 
-      if (total === 0) {
-        setLoading(false)
-        return
-      }
-
-      // Pick random offset (PocketBase pages are 1-indexed when perPage = 1)
-      const page = Math.floor(seededRandom(seed) * total) + 1
-      const result = await pb
-        .collection('albums')
-        .getList<AlbumWithArtist>(page, 1, {
-          expand: 'artist,tag_relations',
-          requestKey: null,
-        })
-
-      if (result.items.length > 0) {
-        setAlbum(result.items[0])
-      }
-    } catch (err) {
-      console.error('Random Album fetch failed:', err)
-    } finally {
-      setLoading(false)
-    }
+  const selectFromPool = useCallback((items: AlbumWithArtist[], seed: number) => {
+    const shuffled = seededShuffle(items, seed)
+    setAlbums(shuffled.slice(0, Math.min(10, Math.max(5, shuffled.length))))
   }, [])
 
   useEffect(() => {
-    fetchRandom(getDailySeed() + 4)
-  }, [fetchRandom])
+    let cancelled = false
+
+    async function load() {
+      try {
+        const result = await pb
+          .collection('albums')
+          .getFullList<AlbumWithArtist>({
+            filter: 'play_count >= 30',
+            sort: '-play_count',
+            expand: 'artist',
+            requestKey: null,
+          })
+
+        if (cancelled) return
+
+        setPool(result)
+        selectFromPool(result, getDailySeed() + 4)
+      } catch (err) {
+        console.error('Featured Albums fetch failed:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [selectFromPool])
 
   function handleShuffle() {
-    fetchRandom(Math.floor(Math.random() * 1000000))
+    selectFromPool(pool, Math.floor(Math.random() * 1000000))
   }
 
   if (loading) {
@@ -772,103 +850,60 @@ function RandomAlbumSection() {
       <section className="mb-8">
         <div className="mb-3 flex items-center gap-2">
           <Shuffle className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Spin the Wheel</h2>
+          <h2 className="text-lg font-semibold">Featured Albums</h2>
         </div>
-        <Card className="overflow-hidden border-border/50 p-0">
-          <Skeleton className="aspect-square w-full rounded-none" />
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-5 w-20" />
-          </div>
-        </Card>
+        <ScrollRow>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="w-[200px] shrink-0 md:w-[250px]">
+              <Card className="gap-0 overflow-hidden border-border/50 p-0">
+                <Skeleton className="aspect-square w-full rounded-none" />
+                <div className="space-y-2 p-3">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              </Card>
+            </div>
+          ))}
+        </ScrollRow>
       </section>
     )
   }
 
-  if (!album) {
+  if (albums.length === 0) {
     return (
       <section className="section-fade-in mb-8">
         <div className="mb-3 flex items-center gap-2">
           <Shuffle className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Spin the Wheel</h2>
+          <h2 className="text-lg font-semibold">Featured Albums</h2>
         </div>
         <EmptyState
           icon={Shuffle}
-          message="No albums in your library yet to spin."
+          message="No albums with enough plays yet. Keep listening!"
         />
       </section>
     )
   }
 
-  const artist = album.expand?.artist
-  const tags = album.expand?.tag_relations ?? []
-  const copyText = `${artist?.name ?? 'Unknown artist'} - ${album.title}`
-
   return (
     <section className="section-fade-in mb-8">
       <div className="mb-3 flex items-center gap-2">
         <Shuffle className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Spin the Wheel</h2>
+        <h2 className="text-lg font-semibold">Featured Albums</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto h-8 w-8"
+          onClick={handleShuffle}
+        >
+          <Shuffle className="h-4 w-4" />
+        </Button>
       </div>
-      <Card
-        className="group relative cursor-pointer overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40"
-        onClick={() => navigate(`/albums/${album.id}`)}
-      >
-        <div className="aspect-square overflow-hidden bg-accent">
-          {album.image_url && !imgError ? (
-            <img
-              src={album.image_url}
-              alt={album.title}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              onError={() => setImgError(true)}
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <Disc3 className="h-16 w-16" strokeWidth={1.5} />
-            </div>
-          )}
-        </div>
-        <CopyButton text={copyText} />
-        <div className="p-4">
-          <h3 className="text-lg font-semibold text-card-foreground">
-            {album.title}
-          </h3>
-          {artist && (
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {artist.name}
-            </p>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary" className="font-normal">
-              {formatPlays(album.play_count)}
-            </Badge>
-            {tags.slice(0, 4).map(tag => (
-              <Link
-                key={tag.id}
-                to={`/tags/${tag.id}`}
-                onClick={e => e.stopPropagation()}
-              >
-                <Badge
-                  variant="outline"
-                  className="text-xs font-normal text-muted-foreground transition-colors hover:text-primary"
-                >
-                  {tag.name}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </Card>
-      <Button
-        variant="outline"
-        className="mt-3 w-full"
-        onClick={handleShuffle}
-      >
-        <Shuffle className="mr-2 h-4 w-4" />
-        Shuffle
-      </Button>
+      <ScrollRow>
+        {albums.map(album => (
+          <FeaturedAlbumCard key={album.id} album={album} />
+        ))}
+      </ScrollRow>
     </section>
   )
 }
@@ -893,11 +928,11 @@ export default function DiscoverPage() {
         <p className="text-muted-foreground">{formatTodayHeader()}</p>
       </div>
 
+      <FeaturedAlbumsSection key={'fa-' + location.key} />
       <OnThisDaySection key={'otd-' + location.key} />
       <GenreDiveSection key={'gd-' + location.key} />
       <DeepCutsSection key={'dc-' + location.key} />
       <ForgottenFavoritesSection key={'ff-' + location.key} />
-      <RandomAlbumSection key={'ra-' + location.key} />
     </div>
   )
 }
