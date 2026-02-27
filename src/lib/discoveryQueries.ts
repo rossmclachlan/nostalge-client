@@ -61,7 +61,10 @@ export async function fetchOnThisDay(
 
   const filter = yearFilters.join(' || ')
 
-  const result = await pb.collection('scrobbles').getFullList<ScrobbleExpanded>({
+  // Use getList instead of getFullList to avoid the implicit skipTotal: true
+  // that getFullList sets internally, which causes totalItems to be 0 and can
+  // break pagination with complex OR filters.
+  const result = await pb.collection('scrobbles').getList<ScrobbleExpanded>(1, 500, {
     filter,
     sort: '-scrobbled_at',
     expand: 'track,track.artist,track.album',
@@ -70,7 +73,7 @@ export async function fetchOnThisDay(
 
   // Group by year
   const groups = new Map<number, ScrobbleExpanded[]>()
-  for (const scrobble of result) {
+  for (const scrobble of result.items) {
     const year = new Date(scrobble.scrobbled_at).getFullYear()
     if (!groups.has(year)) {
       groups.set(year, [])

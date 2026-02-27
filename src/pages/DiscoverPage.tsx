@@ -249,9 +249,11 @@ function OnThisDaySection() {
         }
 
         const filter = yearFilters.join(' || ')
+        // Use getList instead of getFullList to avoid the implicit skipTotal: true
+        // that getFullList sets internally, which causes totalItems to be 0.
         const result = await pb
           .collection('scrobbles')
-          .getFullList<ScrobbleExpanded>({
+          .getList<ScrobbleExpanded>(1, 500, {
             filter,
             sort: '-scrobbled_at',
             expand: 'track,track.artist,track.album',
@@ -262,7 +264,7 @@ function OnThisDaySection() {
 
         // Group scrobbles by year, counting per year
         const byYear = new Map<number, ScrobbleExpanded[]>()
-        for (const s of result) {
+        for (const s of result.items) {
           const year = new Date(s.scrobbled_at).getFullYear()
           if (!byYear.has(year)) byYear.set(year, [])
           byYear.get(year)!.push(s)
