@@ -3,14 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Disc3 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import pb from '@/lib/pocketbase'
-import type { Artist, Album, Track } from '@/types/pocketbase'
+import type { Artist, Album, Track, Tag } from '@/types/pocketbase'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 
-type AlbumWithArtist = Album & { expand?: { artist?: Artist } }
+type AlbumWithArtist = Album & { expand?: { artist?: Artist; tag_relations?: Tag[] } }
 
 function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
@@ -148,7 +148,7 @@ export default function AlbumDetailPage() {
     try {
       const [albumRecord, tracksResult] = await Promise.all([
         pb.collection('albums').getOne<AlbumWithArtist>(albumId, {
-          expand: 'artist',
+          expand: 'artist,tag_relations',
           requestKey: null,
         }),
         pb.collection('tracks').getFullList<Track>({
@@ -241,15 +241,27 @@ export default function AlbumDetailPage() {
                   </Badge>
                 )}
               </div>
-              {album.tags?.length > 0 && (
-                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                  {album.tags.map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs font-normal">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const expandedTags = album.expand?.tag_relations ?? []
+                const fallbackTags = expandedTags.length === 0 ? (album.tags ?? []) : []
+                if (expandedTags.length === 0 && fallbackTags.length === 0) return null
+                return (
+                  <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                    {expandedTags.map(tag => (
+                      <Link key={tag.id} to={`/tags/${tag.id}`}>
+                        <Badge variant="outline" className="text-xs font-normal transition-colors hover:bg-accent hover:text-primary">
+                          {tag.name}
+                        </Badge>
+                      </Link>
+                    ))}
+                    {fallbackTags.map(tag => (
+                      <Badge key={tag} variant="outline" className="text-xs font-normal">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           </div>
 

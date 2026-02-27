@@ -1,13 +1,15 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import pb from '@/lib/pocketbase'
-import type { Artist } from '@/types/pocketbase'
+import type { Artist, Tag } from '@/types/pocketbase'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+
+type ArtistWithTags = Artist & { expand?: { tag_relations?: Tag[] } }
 
 const PER_PAGE = 50
 
@@ -29,30 +31,40 @@ function ArtistCardSkeleton() {
   )
 }
 
-function ArtistCard({ artist }: { artist: Artist }) {
-  const tags = artist.tags?.slice(0, 3) ?? []
+function ArtistCard({ artist }: { artist: ArtistWithTags }) {
+  const navigate = useNavigate()
+  const expandedTags = (artist.expand?.tag_relations ?? []).slice(0, 3)
+  const fallbackTags = expandedTags.length === 0 ? (artist.tags?.slice(0, 3) ?? []) : []
 
   return (
-    <Link to={`/artists/${artist.id}`}>
-      <Card className="border-border/50 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-accent">
-        <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <Badge variant="secondary" className="font-normal">
-            {formatPlays(artist.play_count)}
-          </Badge>
-          {tags.map(tag => (
-            <Badge key={tag} variant="outline" className="text-xs font-normal text-muted-foreground">
-              {tag}
+    <Card
+      className="cursor-pointer border-border/50 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-accent"
+      onClick={() => navigate(`/artists/${artist.id}`)}
+    >
+      <h3 className="truncate font-semibold text-card-foreground">{artist.name}</h3>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <Badge variant="secondary" className="font-normal">
+          {formatPlays(artist.play_count)}
+        </Badge>
+        {expandedTags.map(tag => (
+          <Link key={tag.id} to={`/tags/${tag.id}`} onClick={e => e.stopPropagation()}>
+            <Badge variant="outline" className="text-xs font-normal text-muted-foreground transition-colors hover:text-primary">
+              {tag.name}
             </Badge>
-          ))}
-        </div>
-      </Card>
-    </Link>
+          </Link>
+        ))}
+        {fallbackTags.map(tag => (
+          <Badge key={tag} variant="outline" className="text-xs font-normal text-muted-foreground">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+    </Card>
   )
 }
 
 export default function ArtistsPage() {
-  const [artists, setArtists] = useState<Artist[]>([])
+  const [artists, setArtists] = useState<ArtistWithTags[]>([])
   const [page, setPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -67,8 +79,9 @@ export default function ArtistsPage() {
       try {
         setLoading(true)
         setError(null)
-        const result = await pb.collection('artists').getList<Artist>(1, PER_PAGE, {
+        const result = await pb.collection('artists').getList<ArtistWithTags>(1, PER_PAGE, {
           sort: '-play_count',
+          expand: 'tag_relations',
         })
         if (!cancelled) {
           setArtists(result.items)
@@ -94,8 +107,9 @@ export default function ArtistsPage() {
     const nextPage = page + 1
     setLoadingMore(true)
     try {
-      const result = await pb.collection('artists').getList<Artist>(nextPage, PER_PAGE, {
+      const result = await pb.collection('artists').getList<ArtistWithTags>(nextPage, PER_PAGE, {
         sort: '-play_count',
+        expand: 'tag_relations',
       })
       setArtists(prev => [...prev, ...result.items])
       setPage(nextPage)

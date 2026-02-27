@@ -3,11 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Disc3 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import pb from '@/lib/pocketbase'
-import type { Artist, Album } from '@/types/pocketbase'
+import type { Artist, Album, Tag } from '@/types/pocketbase'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+
+type ArtistWithTags = Artist & { expand?: { tag_relations?: Tag[] } }
 
 function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
@@ -187,7 +189,7 @@ export default function ArtistDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [artist, setArtist] = useState<Artist | null>(null)
+  const [artist, setArtist] = useState<ArtistWithTags | null>(null)
   const [albums, setAlbums] = useState<Album[]>([])
   const [similarMap, setSimilarMap] = useState<Record<string, Artist>>({})
   const [loading, setLoading] = useState(true)
@@ -198,7 +200,7 @@ export default function ArtistDetailPage() {
     setError(null)
     try {
       const [artistRecord, albumsResult] = await Promise.all([
-        pb.collection('artists').getOne<Artist>(artistId, { requestKey: null }),
+        pb.collection('artists').getOne<ArtistWithTags>(artistId, { expand: 'tag_relations', requestKey: null }),
         pb.collection('albums').getFullList<Album>({
           filter: `artist = "${artistId}"`,
           sort: '-play_count',
@@ -285,15 +287,27 @@ export default function ArtistDetailPage() {
                 <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
               )}
             </div>
-            {artist.tags?.length > 0 && (
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                {artist.tags.map(tag => (
-                  <Badge key={tag} variant="outline" className="text-xs font-normal">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const expandedTags = artist.expand?.tag_relations ?? []
+              const fallbackTags = expandedTags.length === 0 ? (artist.tags ?? []) : []
+              if (expandedTags.length === 0 && fallbackTags.length === 0) return null
+              return (
+                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                  {expandedTags.map(tag => (
+                    <Link key={tag.id} to={`/tags/${tag.id}`}>
+                      <Badge variant="outline" className="text-xs font-normal transition-colors hover:bg-accent hover:text-primary">
+                        {tag.name}
+                      </Badge>
+                    </Link>
+                  ))}
+                  {fallbackTags.map(tag => (
+                    <Badge key={tag} variant="outline" className="text-xs font-normal">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Bio */}
