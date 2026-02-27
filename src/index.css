@@ -74,4 +74,38 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: contain;
+}
+
+/* Page transitions */
+.page-enter {
+  animation: pageIn 0.2s ease-out both;
+}
+.page-exit {
+  opacity: 0.5;
+  transition: opacity 0.1s ease-in;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pull-to-refresh */
+.pull-to-refresh-indicator {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+  transition: height 0.2s ease, opacity 0.2s ease;
+  color: var(--muted-foreground);
+  padding-bottom: 8px;
+}
+.pull-to-refresh-indicator.refreshing {
+  transition: none;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }

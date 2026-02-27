@@ -1,4 +1,5 @@
-import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { useRef, useCallback } from 'react'
+import { Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { User, Disc3, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ArtistsPage from '@/pages/ArtistsPage'
@@ -6,6 +7,10 @@ import ArtistDetailPage from '@/pages/ArtistDetailPage'
 import AlbumsPage from '@/pages/AlbumsPage'
 import AlbumDetailPage from '@/pages/AlbumDetailPage'
 import ActivityPage from '@/pages/ActivityPage'
+import InstallPrompt from '@/components/InstallPrompt'
+import PageTransition from '@/components/PageTransition'
+import usePullToRefresh from '@/hooks/usePullToRefresh'
+import ScrollToTop from '@/components/ScrollToTop'
 
 function NavItem({ path, label, icon: Icon }: { path: string; label: string; icon: React.ComponentType<{ className?: string }> }) {
   return (
@@ -27,17 +32,33 @@ function NavItem({ path, label, icon: Icon }: { path: string; label: string; ico
 }
 
 export default function App() {
+  const mainRef = useRef<HTMLElement>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleRefresh = useCallback(async () => {
+    // Re-navigate to the same path to trigger a re-mount/re-fetch
+    navigate(location.pathname, { replace: true })
+    // Small delay so the user sees the refresh indicator
+    await new Promise(r => setTimeout(r, 300))
+  }, [location.pathname, navigate])
+
+  usePullToRefresh({ onRefresh: handleRefresh, containerRef: mainRef })
+
   return (
     <div className="flex h-full flex-col">
-      <main className="flex-1 overflow-y-auto pb-16">
-        <Routes>
-          <Route path="/" element={<Navigate to="/artists" replace />} />
-          <Route path="/artists" element={<ArtistsPage />} />
-          <Route path="/artists/:id" element={<ArtistDetailPage />} />
-          <Route path="/albums" element={<AlbumsPage />} />
-          <Route path="/albums/:id" element={<AlbumDetailPage />} />
-          <Route path="/activity" element={<ActivityPage />} />
-        </Routes>
+      <main ref={mainRef} className="flex-1 overflow-y-auto pb-16">
+        <ScrollToTop />
+        <PageTransition>
+          <Routes location={location}>
+            <Route path="/" element={<Navigate to="/artists" replace />} />
+            <Route path="/artists" element={<ArtistsPage />} />
+            <Route path="/artists/:id" element={<ArtistDetailPage />} />
+            <Route path="/albums" element={<AlbumsPage />} />
+            <Route path="/albums/:id" element={<AlbumDetailPage />} />
+            <Route path="/activity" element={<ActivityPage />} />
+          </Routes>
+        </PageTransition>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 flex justify-around border-t border-border bg-card safe-bottom">
@@ -45,6 +66,8 @@ export default function App() {
         <NavItem path="/albums" label="Albums" icon={Disc3} />
         <NavItem path="/activity" label="Activity" icon={Clock} />
       </nav>
+
+      <InstallPrompt />
     </div>
   )
 }
