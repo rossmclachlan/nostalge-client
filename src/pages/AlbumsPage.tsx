@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Disc3, Copy, Check } from 'lucide-react'
 import pb from '@/lib/pocketbase'
-import type { Album, Artist } from '@/types/pocketbase'
+import type { Album, Artist, Tag } from '@/types/pocketbase'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const PER_PAGE = 50
 
-type AlbumWithArtist = Album & { expand?: { artist?: Artist } }
+type AlbumWithArtist = Album & { expand?: { artist?: Artist; tag_relations?: Tag[] } }
 
 function formatPlays(count: number): string {
   return count.toLocaleString() + ' plays'
@@ -96,9 +96,23 @@ function AlbumCard({ album }: { album: AlbumWithArtist }) {
         ) : (
           <p className="mt-0.5 truncate text-sm text-muted-foreground">Unknown artist</p>
         )}
-        <Badge variant="secondary" className="mt-1.5 font-normal">
-          {formatPlays(album.play_count)}
-        </Badge>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="font-normal">
+            {formatPlays(album.play_count)}
+          </Badge>
+          {(album.expand?.tag_relations ?? []).slice(0, 2).map(tag => (
+            <Link key={tag.id} to={`/tags/${tag.id}`}>
+              <Badge variant="outline" className="text-xs font-normal text-muted-foreground transition-colors hover:text-primary">
+                {tag.name}
+              </Badge>
+            </Link>
+          ))}
+          {(album.expand?.tag_relations ?? []).length === 0 && (album.tags ?? []).slice(0, 2).map(tag => (
+            <Badge key={tag} variant="outline" className="text-xs font-normal text-muted-foreground">
+              {tag}
+            </Badge>
+          ))}
+        </div>
       </div>
     </Card>
   )
@@ -122,7 +136,7 @@ export default function AlbumsPage() {
         setError(null)
         const result = await pb.collection('albums').getList<AlbumWithArtist>(1, PER_PAGE, {
           sort: '-play_count',
-          expand: 'artist',
+          expand: 'artist,tag_relations',
         })
         if (!cancelled) {
           setAlbums(result.items)
@@ -150,7 +164,7 @@ export default function AlbumsPage() {
     try {
       const result = await pb.collection('albums').getList<AlbumWithArtist>(nextPage, PER_PAGE, {
         sort: '-play_count',
-        expand: 'artist',
+        expand: 'artist,tag_relations',
       })
       setAlbums(prev => [...prev, ...result.items])
       setPage(nextPage)
