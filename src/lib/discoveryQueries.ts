@@ -40,22 +40,18 @@ export async function fetchOnThisDay(
   month: number,
   day: number,
 ): Promise<OnThisDayGroup[]> {
-  const mm = String(month).padStart(2, '0')
-  const dd = String(day).padStart(2, '0')
   const currentYear = new Date().getFullYear()
 
-  // Build explicit date range filters for each previous year.
-  // PocketBase's ~ (contains) operator isn't reliable on datetime fields,
-  // so we use exact >= / < range comparisons instead.
+  // Build date range filters for each previous year, widened by ±1 day to
+  // account for timezone differences. Scrobbles are stored in UTC, so e.g.
+  // "Feb 27 at 11pm Pacific" is stored as "Feb 28 UTC". We fetch a wider
+  // window and then filter client-side by the user's local date.
   const yearFilters: string[] = []
   for (let year = currentYear - 1; year >= currentYear - 10; year--) {
-    const startDate = `${year}-${mm}-${dd} 00:00:00`
-    // Compute the next day to form an exclusive upper bound
-    const nextDay = new Date(year, month - 1, Number(dd) + 1)
-    const ny = nextDay.getFullYear()
-    const nm = String(nextDay.getMonth() + 1).padStart(2, '0')
-    const nd = String(nextDay.getDate()).padStart(2, '0')
-    const endDate = `${ny}-${nm}-${nd} 00:00:00`
+    const prevDay = new Date(year, month - 1, day - 1)
+    const dayAfterNext = new Date(year, month - 1, day + 2)
+    const startDate = `${prevDay.getFullYear()}-${String(prevDay.getMonth() + 1).padStart(2, '0')}-${String(prevDay.getDate()).padStart(2, '0')} 00:00:00`
+    const endDate = `${dayAfterNext.getFullYear()}-${String(dayAfterNext.getMonth() + 1).padStart(2, '0')}-${String(dayAfterNext.getDate()).padStart(2, '0')} 00:00:00`
     yearFilters.push(`(scrobbled_at >= '${startDate}' && scrobbled_at < '${endDate}')`)
   }
 
@@ -71,9 +67,16 @@ export async function fetchOnThisDay(
     requestKey: null,
   })
 
-  // Group by year
+  // Filter client-side: only keep scrobbles whose local date matches the
+  // target month/day (the wider UTC window may include adjacent-day scrobbles).
+  const filtered = result.items.filter((scrobble) => {
+    const local = new Date(scrobble.scrobbled_at)
+    return local.getMonth() + 1 === month && local.getDate() === day
+  })
+
+  // Group by year (using local time for consistency)
   const groups = new Map<number, ScrobbleExpanded[]>()
-  for (const scrobble of result.items) {
+  for (const scrobble of filtered) {
     const year = new Date(scrobble.scrobbled_at).getFullYear()
     if (!groups.has(year)) {
       groups.set(year, [])

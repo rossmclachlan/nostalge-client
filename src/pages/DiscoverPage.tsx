@@ -237,14 +237,18 @@ function OnThisDaySection() {
         const day = now.getDate()
         const currentYear = now.getFullYear()
 
-        // Build date-range filters for the same calendar date in each previous year
+        // Build date-range filters for the same calendar date in each previous year.
+        // Widen by ±1 day to account for timezone offset — scrobbles are stored in
+        // UTC, so e.g. "Feb 27 at 11pm Pacific" is "Feb 28 UTC". We filter
+        // client-side afterward by the user's local date.
         const yearFilters: string[] = []
         for (let y = currentYear - 1; y >= currentYear - 10; y--) {
-          const dateStr = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          const nextDate = new Date(y, month - 1, day + 1)
-          const nextStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`
+          const prevDay = new Date(y, month - 1, day - 1)
+          const dayAfterNext = new Date(y, month - 1, day + 2)
+          const startStr = `${prevDay.getFullYear()}-${String(prevDay.getMonth() + 1).padStart(2, '0')}-${String(prevDay.getDate()).padStart(2, '0')}`
+          const endStr = `${dayAfterNext.getFullYear()}-${String(dayAfterNext.getMonth() + 1).padStart(2, '0')}-${String(dayAfterNext.getDate()).padStart(2, '0')}`
           yearFilters.push(
-            `(scrobbled_at >= "${dateStr} 00:00:00" && scrobbled_at < "${nextStr} 00:00:00")`,
+            `(scrobbled_at >= "${startStr} 00:00:00" && scrobbled_at < "${endStr} 00:00:00")`,
           )
         }
 
@@ -262,9 +266,16 @@ function OnThisDaySection() {
 
         if (cancelled) return
 
+        // Filter client-side: only keep scrobbles whose local date matches
+        // the target month/day (wider UTC window may include adjacent days).
+        const matched = result.items.filter((s) => {
+          const local = new Date(s.scrobbled_at)
+          return local.getMonth() + 1 === month && local.getDate() === day
+        })
+
         // Group scrobbles by year, counting per year
         const byYear = new Map<number, ScrobbleExpanded[]>()
-        for (const s of result.items) {
+        for (const s of matched) {
           const year = new Date(s.scrobbled_at).getFullYear()
           if (!byYear.has(year)) byYear.set(year, [])
           byYear.get(year)!.push(s)
