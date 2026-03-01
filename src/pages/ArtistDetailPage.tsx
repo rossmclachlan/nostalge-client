@@ -19,6 +19,19 @@ function formatListeners(count: number): string {
   return count.toLocaleString() + ' listeners'
 }
 
+function getInitials(name: string): string {
+  return name.split(/\s+/).slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase()
+}
+
+function getGradientForName(name: string): string {
+  let hash = 0
+  for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash)
+  const base = Math.abs(hash % 60)
+  const hue1 = 25 + base
+  const hue2 = (hue1 + 30) % 360
+  return `linear-gradient(135deg, hsl(${hue1}, 55%, 28%), hsl(${hue2}, 45%, 18%))`
+}
+
 function parseSimilarArtistName(entry: unknown): string | null {
   if (typeof entry === 'string') return entry
   if (entry && typeof entry === 'object' && 'name' in entry && typeof (entry as { name: unknown }).name === 'string') {
@@ -31,24 +44,13 @@ function parseSimilarArtistName(entry: unknown): string | null {
 
 function HeroSkeleton() {
   return (
-    <div className="space-y-3 text-center">
-      <Skeleton className="mx-auto h-9 w-56" />
-      <div className="flex justify-center gap-2">
-        <Skeleton className="h-5 w-20" />
-        <Skeleton className="h-5 w-24" />
-      </div>
-      <div className="flex justify-center gap-1.5">
-        <Skeleton className="h-5 w-14" />
-        <Skeleton className="h-5 w-14" />
-        <Skeleton className="h-5 w-14" />
-      </div>
-    </div>
+    <Skeleton className="h-[250px] w-full rounded-xl md:h-[350px]" />
   )
 }
 
 function BioSkeleton() {
   return (
-    <Card className="border-border/50">
+    <Card className="bg-card">
       <CardContent className="space-y-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-full" />
@@ -60,15 +62,9 @@ function BioSkeleton() {
 
 function AlbumGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
       {Array.from({ length: 6 }).map((_, i) => (
-        <Card key={i} className="gap-0 overflow-hidden border-border/50 p-0">
-          <Skeleton className="aspect-square w-full rounded-none" />
-          <div className="space-y-2 p-3">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-          </div>
-        </Card>
+        <Skeleton key={i} className="aspect-square w-full rounded-xl" />
       ))}
     </div>
   )
@@ -96,7 +92,6 @@ function BioSection({ bio }: { bio: string }) {
   useEffect(() => {
     const el = contentRef.current
     if (el) {
-      // line-clamp-3 at text-sm ~ 3 * 1.25rem line-height = 60px
       setClamped(el.scrollHeight > el.clientHeight + 2)
     }
   }, [bio])
@@ -107,9 +102,9 @@ function BioSection({ bio }: { bio: string }) {
   })
 
   return (
-    <Card className="border-border/50">
+    <Card className="bg-card">
       <CardContent>
-        <h2 className="mb-3 text-lg font-semibold">About</h2>
+        <h2 className="section-heading mb-3 text-lg">About</h2>
         <div
           ref={contentRef}
           className={`prose-invert text-sm leading-relaxed text-muted-foreground [&_a]:text-primary [&_a]:underline ${expanded ? '' : 'line-clamp-3'}`}
@@ -137,29 +132,26 @@ function AlbumCard({ album }: { album: Album }) {
 
   return (
     <Link to={`/albums/${album.id}`}>
-      <Card className="group gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
-        <div className="aspect-square overflow-hidden bg-accent">
-          {album.image_url && !imgError ? (
-            <img
-              src={album.image_url}
-              alt={album.title}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              onError={() => setImgError(true)}
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <Disc3 className="h-12 w-12" strokeWidth={1.5} />
-            </div>
-          )}
+      <div className="card-hover group relative aspect-square overflow-hidden rounded-xl album-art-shadow-sm">
+        {album.image_url && !imgError ? (
+          <img
+            src={album.image_url}
+            alt={album.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-accent text-muted-foreground">
+            <Disc3 className="h-12 w-12" strokeWidth={1.5} />
+          </div>
+        )}
+        <div className="album-card-gradient absolute inset-0" />
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <h3 className="truncate text-sm font-medium text-white">{album.title}</h3>
+          <span className="text-[10px] text-white/50">{formatPlays(album.play_count)}</span>
         </div>
-        <div className="p-3">
-          <h3 className="truncate font-semibold text-card-foreground">{album.title}</h3>
-          <Badge variant="secondary" className="mt-1.5 font-normal">
-            {formatPlays(album.play_count)}
-          </Badge>
-        </div>
-      </Card>
+      </div>
     </Link>
   )
 }
@@ -213,7 +205,6 @@ export default function ArtistDetailPage() {
       setArtist(artistRecord)
       setAlbums(albumsResult)
 
-      // Resolve similar artists — look up by name
       const names = (artistRecord.similar_artists ?? [])
         .map(parseSimilarArtistName)
         .filter((n): n is string => n !== null)
@@ -230,7 +221,6 @@ export default function ArtistDetailPage() {
           }
           setSimilarMap(map)
         } catch {
-          // Non-critical — just show names without links
           setSimilarMap({})
         }
       }
@@ -248,23 +238,24 @@ export default function ArtistDetailPage() {
   }, [id, fetchData])
 
   return (
-    <div className="p-4">
+    <div className="px-4 py-6">
       {/* Header with back button */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-5 flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
+          className="text-muted-foreground hover:text-foreground"
           onClick={() => navigate('/artists')}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
         </Button>
-        <h1 className="truncate text-lg font-semibold">
+        <h1 className="truncate text-lg font-medium text-white">
           {loading ? <Skeleton className="h-6 w-32" /> : artist?.name ?? 'Artist'}
         </h1>
       </div>
 
       {loading ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <HeroSkeleton />
           <BioSkeleton />
           <div>
@@ -279,10 +270,10 @@ export default function ArtistDetailPage() {
       ) : error ? (
         <p className="py-12 text-center text-destructive">{error}</p>
       ) : artist ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Hero section */}
           {artist.image_url && !heroImgError ? (
-            <div className="relative h-[250px] overflow-hidden rounded-xl md:h-[350px]">
+            <div className="relative h-[250px] overflow-hidden rounded-xl album-art-shadow md:h-[350px]">
               <img
                 src={artist.image_url}
                 alt={artist.name}
@@ -291,8 +282,8 @@ export default function ArtistDetailPage() {
                 onError={() => setHeroImgError(true)}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <h2 className="text-3xl font-bold drop-shadow-lg">{artist.name}</h2>
+              <div className="absolute bottom-0 left-0 right-0 p-5">
+                <h2 className="page-title text-3xl drop-shadow-lg">{artist.name}</h2>
                 <div className="mt-2 flex gap-2">
                   <Badge>{formatPlays(artist.play_count)}</Badge>
                   {artist.listener_count > 0 && (
@@ -302,13 +293,19 @@ export default function ArtistDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="text-center">
-              <h2 className="text-3xl font-bold">{artist.name}</h2>
-              <div className="mt-3 flex justify-center gap-2">
-                <Badge>{formatPlays(artist.play_count)}</Badge>
-                {artist.listener_count > 0 && (
-                  <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
-                )}
+            <div className="relative h-[200px] overflow-hidden rounded-xl" style={{ background: getGradientForName(artist.name) }}>
+              <div className="absolute inset-0 flex items-center justify-center text-6xl font-light text-white/20">
+                {getInitials(artist.name)}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-5">
+                <h2 className="page-title text-3xl text-white">{artist.name}</h2>
+                <div className="mt-2 flex gap-2">
+                  <Badge>{formatPlays(artist.play_count)}</Badge>
+                  {artist.listener_count > 0 && (
+                    <Badge variant="secondary">{formatListeners(artist.listener_count)}</Badge>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -319,7 +316,7 @@ export default function ArtistDetailPage() {
             const fallbackTags = expandedTags.length === 0 ? (artist.tags ?? []) : []
             if (expandedTags.length === 0 && fallbackTags.length === 0) return null
             return (
-              <div className="-mt-3 flex flex-wrap justify-center gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {expandedTags.map(tag => (
                   <Link key={tag.id} to={`/tags/${tag.id}`}>
                     <Badge variant="outline" className="text-xs font-normal transition-colors hover:bg-accent hover:text-primary">
@@ -342,8 +339,8 @@ export default function ArtistDetailPage() {
           {/* Albums */}
           {albums.length > 0 && (
             <div>
-              <h2 className="mb-3 text-lg font-semibold">Albums</h2>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+              <h2 className="section-heading mb-4 text-lg">Albums</h2>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                 {albums.map(album => (
                   <AlbumCard key={album.id} album={album} />
                 ))}
@@ -358,7 +355,7 @@ export default function ArtistDetailPage() {
               .filter((n): n is string => n !== null)
             return names.length > 0 ? (
               <div>
-                <h2 className="mb-3 text-lg font-semibold">Similar Artists</h2>
+                <h2 className="section-heading mb-4 text-lg">Similar Artists</h2>
                 <div className="flex flex-wrap gap-2">
                   {names.map(name => (
                     <SimilarArtistPill

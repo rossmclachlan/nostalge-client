@@ -11,16 +11,16 @@ function getTagStyle(usageCount: number, maxCount: number) {
   const ratio = maxCount > 0 ? usageCount / maxCount : 0
 
   if (ratio > 0.6) {
-    return 'text-base font-bold'
+    return 'text-base font-semibold'
   }
   if (ratio > 0.3) {
-    return 'text-sm font-semibold'
+    return 'text-sm font-medium'
   }
   return 'text-xs font-normal'
 }
 
 function TagPillSkeleton({ width }: { width: string }) {
-  return <Skeleton className={`h-8 rounded-md ${width}`} />
+  return <Skeleton className={`h-8 rounded-lg ${width}`} />
 }
 
 export default function TagsPage() {
@@ -71,17 +71,17 @@ export default function TagsPage() {
   const skeletonWidths = ['w-16', 'w-24', 'w-20', 'w-14', 'w-28', 'w-18', 'w-22', 'w-16', 'w-20', 'w-24', 'w-14', 'w-28']
 
   return (
-    <div className="p-4">
-      <h1 className="mb-4 text-2xl font-bold">Tags</h1>
+    <div className="px-4 py-6">
+      <h1 className="page-title mb-5 text-3xl">Tags</h1>
 
-      <div className="relative mb-4">
+      <div className="relative mb-5">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
           placeholder="Search tags..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="h-10 bg-card pl-9"
+          className="h-10 rounded-xl border-none bg-card pl-9"
         />
       </div>
 
@@ -94,7 +94,7 @@ export default function TagsPage() {
       ) : error ? (
         <p className="py-12 text-center text-destructive">{error}</p>
       ) : filtered.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">
+        <p className="py-12 text-center text-sm text-muted-foreground">
           {search ? 'No tags match your search.' : 'No tags found.'}
         </p>
       ) : (
@@ -103,7 +103,7 @@ export default function TagsPage() {
             <Link key={tag.id} to={`/tags/${tag.id}`}>
               <Badge
                 variant="secondary"
-                className={`cursor-pointer transition-colors hover:bg-accent hover:text-primary ${getTagStyle(tag.usage_count, maxCount)}`}
+                className={`cursor-pointer rounded-lg transition-colors hover:bg-accent hover:text-primary ${getTagStyle(tag.usage_count, maxCount)}`}
               >
                 {tag.name}
               </Badge>
