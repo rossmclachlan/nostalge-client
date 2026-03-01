@@ -66,7 +66,7 @@ function StatsSkeleton() {
   return (
     <div className="grid grid-cols-3 gap-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <Card key={i} className="border-border/50 py-4">
+        <Card key={i} className="bg-card py-4">
           <CardContent className="flex flex-col items-center gap-1 p-0 px-3">
             <Skeleton className="h-4 w-4" />
             <Skeleton className="h-6 w-12" />
@@ -83,7 +83,7 @@ function ScrobbleListSkeleton() {
     <div className="space-y-0">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i}>
-          {i > 0 && <Separator />}
+          {i > 0 && <Separator className="opacity-30" />}
           <div className="flex items-center gap-3 py-3">
             <Skeleton className="h-10 w-10 rounded-lg" />
             <div className="min-w-0 flex-1 space-y-1.5">
@@ -101,16 +101,16 @@ function ScrobbleListSkeleton() {
 // --- Stat card ---
 
 function StatCard({ icon: Icon, value, label }: {
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>
   value: number | null
   label: string
 }) {
   return (
-    <Card className="border-border/50 py-4">
+    <Card className="bg-card py-4">
       <CardContent className="flex flex-col items-center gap-1 p-0 px-3">
-        <Icon className="h-4 w-4 text-primary" />
+        <Icon className="h-4 w-4 text-primary" strokeWidth={1.5} />
         {value !== null ? (
-          <span className="text-xl font-bold">{value.toLocaleString()}</span>
+          <span className="text-xl font-semibold text-white">{value.toLocaleString()}</span>
         ) : (
           <Skeleton className="h-6 w-12" />
         )}
@@ -139,22 +139,22 @@ function ScrobbleRow({ scrobble }: { scrobble: ScrobbleExpanded }) {
             onError={() => setImgError(true)}
           />
         ) : (
-          <AvatarFallback className="rounded-lg">
-            <Disc3 className="h-4 w-4" />
+          <AvatarFallback className="rounded-lg bg-accent">
+            <Disc3 className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
           </AvatarFallback>
         )}
       </Avatar>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{track?.title ?? 'Unknown track'}</p>
+        <p className="truncate text-sm font-normal text-foreground">{track?.title ?? 'Unknown track'}</p>
         <p className="truncate text-xs text-muted-foreground">{artist?.name ?? 'Unknown artist'}</p>
       </div>
-      <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(scrobble.scrobbled_at)}</span>
+      <span className="shrink-0 text-xs text-muted-foreground/60">{timeAgo(scrobble.scrobbled_at)}</span>
     </div>
   )
 
   if (album) {
     return (
-      <Link to={`/albums/${album.id}`} className="block transition-colors hover:bg-accent/50 -mx-2 px-2 rounded-md">
+      <Link to={`/albums/${album.id}`} className="-mx-2 block rounded-lg px-2 transition-colors hover:bg-accent/50">
         {content}
       </Link>
     )
@@ -192,7 +192,7 @@ export default function ActivityPage() {
         setTotalArtists(a.totalItems)
         setTotalAlbums(al.totalItems)
       } catch {
-        // Non-critical — stats just won't show numbers
+        // Non-critical
       }
     }
     fetchStats()
@@ -286,16 +286,16 @@ export default function ActivityPage() {
   }, [scrobbles])
 
   return (
-    <div className="p-4">
-      <h1 className="mb-4 text-2xl font-bold">Activity</h1>
+    <div className="px-4 py-6">
+      <h1 className="page-title mb-5 text-3xl">Activity</h1>
 
       {/* Stats summary */}
       {totalScrobbles === null && totalArtists === null && totalAlbums === null ? (
-        <div className="mb-6">
+        <div className="mb-8">
           <StatsSkeleton />
         </div>
       ) : (
-        <div className="mb-6 grid grid-cols-3 gap-3">
+        <div className="mb-8 grid grid-cols-3 gap-3">
           <StatCard icon={Music} value={totalScrobbles} label="Scrobbles" />
           <StatCard icon={Users} value={totalArtists} label="Artists" />
           <StatCard icon={Disc3} value={totalAlbums} label="Albums" />
@@ -308,20 +308,20 @@ export default function ActivityPage() {
       ) : error ? (
         <p className="py-12 text-center text-destructive">{error}</p>
       ) : scrobbles.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">No scrobbles yet.</p>
+        <p className="py-12 text-center text-sm text-muted-foreground">No scrobbles yet.</p>
       ) : (
         <div className="space-y-4">
           {grouped.map(group => (
             <div key={group.key}>
               <div className="flex items-center gap-3 py-2">
-                <Separator className="flex-1" />
-                <span className="shrink-0 text-xs font-medium text-muted-foreground">{group.label}</span>
-                <Separator className="flex-1" />
+                <Separator className="flex-1 opacity-30" />
+                <span className="shrink-0 text-xs font-light text-muted-foreground">{group.label}</span>
+                <Separator className="flex-1 opacity-30" />
               </div>
               <div>
                 {group.items.map((scrobble, i) => (
                   <div key={scrobble.id}>
-                    {i > 0 && <Separator className="ml-13" />}
+                    {i > 0 && <Separator className="ml-13 opacity-20" />}
                     <ScrobbleRow scrobble={scrobble} />
                   </div>
                 ))}
@@ -333,7 +333,7 @@ export default function ActivityPage() {
           {hasMore && (
             <div ref={sentinelRef} className="flex justify-center py-4">
               {loadingMore && (
-                <Button variant="ghost" disabled className="pointer-events-none">
+                <Button variant="ghost" disabled className="pointer-events-none text-muted-foreground">
                   Loading...
                 </Button>
               )}

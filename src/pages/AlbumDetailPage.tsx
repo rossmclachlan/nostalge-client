@@ -27,8 +27,8 @@ function formatDuration(seconds: number): string {
 
 function HeroSkeleton() {
   return (
-    <div className="space-y-4">
-      <Skeleton className="mx-auto aspect-square w-56 rounded-xl" />
+    <div className="flex flex-col items-center gap-5">
+      <Skeleton className="aspect-square w-64 rounded-xl" />
       <div className="space-y-2 text-center">
         <Skeleton className="mx-auto h-8 w-48" />
         <Skeleton className="mx-auto h-5 w-32" />
@@ -43,7 +43,7 @@ function HeroSkeleton() {
 
 function SummarySkeleton() {
   return (
-    <Card className="border-border/50">
+    <Card className="bg-card">
       <CardContent className="space-y-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-full" />
@@ -58,7 +58,7 @@ function TrackListSkeleton() {
     <div className="space-y-0">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i}>
-          {i > 0 && <Separator />}
+          {i > 0 && <Separator className="opacity-30" />}
           <div className="flex items-center gap-3 py-3">
             <Skeleton className="h-4 w-5" />
             <Skeleton className="h-4 flex-1" />
@@ -91,9 +91,9 @@ function SummarySection({ summary }: { summary: string }) {
   })
 
   return (
-    <Card className="border-border/50">
+    <Card className="bg-card">
       <CardContent>
-        <h2 className="mb-3 text-lg font-semibold">About</h2>
+        <h2 className="section-heading mb-3 text-lg">About</h2>
         <div
           ref={contentRef}
           className={`prose-invert text-sm leading-relaxed text-muted-foreground [&_a]:text-primary [&_a]:underline ${expanded ? '' : 'line-clamp-3'}`}
@@ -119,9 +119,9 @@ function SummarySection({ summary }: { summary: string }) {
 function TrackRow({ track, index }: { track: Track; index: number }) {
   return (
     <div className="flex items-center gap-3 py-3">
-      <span className="w-5 text-right text-sm text-muted-foreground">{index + 1}</span>
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{track.title}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">{formatDuration(track.duration)}</span>
+      <span className="w-5 text-right text-sm text-muted-foreground/60">{index + 1}</span>
+      <span className="min-w-0 flex-1 truncate text-sm font-normal text-foreground">{track.title}</span>
+      <span className="shrink-0 text-xs text-muted-foreground/60">{formatDuration(track.duration)}</span>
       <Badge variant="secondary" className="shrink-0 font-normal">
         {formatPlays(track.play_count)}
       </Badge>
@@ -176,23 +176,24 @@ export default function AlbumDetailPage() {
   const artist = album?.expand?.artist
 
   return (
-    <div className="p-4">
+    <div className="px-4 py-6">
       {/* Header with back button */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-5 flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
+          className="text-muted-foreground hover:text-foreground"
           onClick={() => navigate('/albums')}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
         </Button>
-        <h1 className="truncate text-lg font-semibold">
+        <h1 className="truncate text-lg font-medium text-white">
           {loading ? <Skeleton className="h-6 w-32" /> : album?.title ?? 'Album'}
         </h1>
       </div>
 
       {loading ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <HeroSkeleton />
           <SummarySkeleton />
           <div>
@@ -203,10 +204,10 @@ export default function AlbumDetailPage() {
       ) : error ? (
         <p className="py-12 text-center text-destructive">{error}</p>
       ) : album ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Hero section */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-56 w-56 overflow-hidden rounded-xl bg-accent shadow-lg">
+          <div className="flex flex-col items-center gap-5">
+            <div className="h-64 w-64 overflow-hidden rounded-xl album-art-shadow">
               {album.image_url && !heroImgError ? (
                 <img
                   src={album.image_url}
@@ -216,13 +217,13 @@ export default function AlbumDetailPage() {
                   loading="lazy"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <div className="flex h-full w-full items-center justify-center bg-accent text-muted-foreground">
                   <Disc3 className="h-16 w-16" strokeWidth={1.5} />
                 </div>
               )}
             </div>
             <div className="text-center">
-              <h2 className="text-3xl font-bold">{album.title}</h2>
+              <h2 className="page-title text-3xl">{album.title}</h2>
               {artist ? (
                 <Link
                   to={`/artists/${artist.id}`}
@@ -231,7 +232,7 @@ export default function AlbumDetailPage() {
                   {artist.name}
                 </Link>
               ) : (
-                <p className="mt-1 text-muted-foreground">Unknown artist</p>
+                <p className="mt-1 text-sm text-muted-foreground">Unknown artist</p>
               )}
               <div className="mt-3 flex justify-center gap-2">
                 <Badge>{formatPlays(album.play_count)}</Badge>
@@ -271,12 +272,12 @@ export default function AlbumDetailPage() {
           {/* Track listing */}
           {tracks.length > 0 && (
             <div>
-              <h2 className="mb-3 text-lg font-semibold">Tracks</h2>
-              <Card className="border-border/50 px-4 py-0">
+              <h2 className="section-heading mb-4 text-lg">Tracks</h2>
+              <Card className="bg-card px-4 py-0">
                 <CardContent className="p-0">
                   {tracks.map((track, i) => (
                     <div key={track.id}>
-                      {i > 0 && <Separator />}
+                      {i > 0 && <Separator className="opacity-30" />}
                       <TrackRow track={track} index={i} />
                     </div>
                   ))}

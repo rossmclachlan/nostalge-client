@@ -12,7 +12,6 @@ import {
 import pb from '@/lib/pocketbase'
 import type { Album, Artist, Tag, Track, Scrobble } from '@/types/pocketbase'
 import { getDailySeed, seededShuffle, seededRandom } from '@/lib/discovery'
-import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -46,9 +45,10 @@ function getInitials(name: string): string {
 function getGradientForName(name: string): string {
   let hash = 0
   for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash)
-  const hue1 = Math.abs(hash % 360)
-  const hue2 = (hue1 + 40) % 360
-  return `linear-gradient(135deg, hsl(${hue1}, 50%, 30%), hsl(${hue2}, 50%, 20%))`
+  const base = Math.abs(hash % 60)
+  const hue1 = 25 + base
+  const hue2 = (hue1 + 30) % 360
+  return `linear-gradient(135deg, hsl(${hue1}, 55%, 28%), hsl(${hue2}, 45%, 18%))`
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -66,20 +66,20 @@ function CopyButton({ text }: { text: string }) {
     <Button
       variant="ghost"
       size="icon"
-      className="absolute right-1.5 top-1.5 h-7 w-7 bg-background/70 opacity-100 backdrop-blur-sm transition-opacity md:opacity-0 md:group-hover:opacity-100"
+      className="absolute right-1.5 top-1.5 z-10 h-7 w-7 bg-black/50 opacity-100 backdrop-blur-sm transition-opacity md:opacity-0 md:group-hover:opacity-100"
       onClick={handleCopy}
     >
       {copied ? (
         <Check className="h-3.5 w-3.5 text-primary" />
       ) : (
-        <Copy className="h-3.5 w-3.5" />
+        <Copy className="h-3.5 w-3.5 text-white" />
       )}
     </Button>
   )
 }
 
 const SCROLL_ROW =
-  'flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+  'flex gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
 
 function ScrollRow({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
@@ -87,7 +87,7 @@ function ScrollRow({ children, className }: { children: React.ReactNode; classNa
       <div className={SCROLL_ROW + (className ? ' ' + className : '')}>
         {children}
       </div>
-      <div className="pointer-events-none absolute bottom-2 right-0 top-0 w-8 bg-gradient-to-r from-transparent to-background" />
+      <div className="pointer-events-none absolute bottom-2 right-0 top-0 w-12 bg-gradient-to-r from-transparent to-background" />
     </div>
   )
 }
@@ -96,12 +96,12 @@ function EmptyState({
   icon: Icon,
   message,
 }: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>
   message: string
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/50 py-8">
-      <Icon className="mb-2 h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
+    <div className="flex flex-col items-center justify-center rounded-xl bg-card/50 py-8">
+      <Icon className="mb-2 h-8 w-8 text-muted-foreground/30" strokeWidth={1.5} />
       <p className="max-w-xs text-center text-sm text-muted-foreground">
         {message}
       </p>
@@ -109,7 +109,7 @@ function EmptyState({
   )
 }
 
-/* ── Mini cards for horizontal scroll rows ── */
+/* ── Mini cards for horizontal scroll rows — art-forward with overlay text ── */
 
 function MiniAlbumCard({
   album,
@@ -123,49 +123,34 @@ function MiniAlbumCard({
   const copyText = `${artist?.name ?? 'Unknown artist'} - ${album.title}`
 
   return (
-    <div className="w-40 shrink-0">
-      <Card className="group relative gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+    <div className="w-44 shrink-0">
+      <div className="card-hover group relative aspect-square overflow-hidden rounded-xl album-art-shadow-sm">
         <Link to={`/albums/${album.id}`}>
-          <div className="aspect-square overflow-hidden bg-accent">
-            {album.image_url && !imgError ? (
-              <img
-                src={album.image_url}
-                alt={album.title}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                onError={() => setImgError(true)}
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Disc3 className="h-8 w-8" strokeWidth={1.5} />
-              </div>
-            )}
+          {album.image_url && !imgError ? (
+            <img
+              src={album.image_url}
+              alt={album.title}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-accent text-muted-foreground">
+              <Disc3 className="h-10 w-10" strokeWidth={1.5} />
+            </div>
+          )}
+          <div className="album-card-gradient absolute inset-0" />
+          <div className="absolute bottom-0 left-0 right-0 p-3">
+            <h3 className="truncate text-sm font-medium text-white">
+              {album.title}
+            </h3>
+            <p className="truncate text-xs text-white/70">
+              {artist?.name ?? 'Unknown artist'}
+            </p>
           </div>
         </Link>
         {showCopy && <CopyButton text={copyText} />}
-        <div className="p-2.5">
-          <Link to={`/albums/${album.id}`}>
-            <h3 className="truncate text-sm font-semibold text-card-foreground">
-              {album.title}
-            </h3>
-          </Link>
-          {artist ? (
-            <Link
-              to={`/artists/${artist.id}`}
-              className="mt-0.5 block truncate text-xs text-muted-foreground transition-colors hover:text-primary"
-            >
-              {artist.name}
-            </Link>
-          ) : (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              Unknown artist
-            </p>
-          )}
-          <Badge variant="secondary" className="mt-1 text-xs font-normal">
-            {formatPlays(album.play_count)}
-          </Badge>
-        </div>
-      </Card>
+      </div>
     </div>
   )
 }
@@ -175,38 +160,37 @@ function MiniArtistCard({ artist }: { artist: Artist }) {
   const [imgError, setImgError] = useState(false)
 
   return (
-    <div className="w-36 shrink-0">
-      <Card
-        className="group cursor-pointer overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent"
+    <div className="w-40 shrink-0">
+      <div
+        className="card-hover group relative aspect-square cursor-pointer overflow-hidden rounded-xl album-art-shadow-sm"
         onClick={() => navigate(`/artists/${artist.id}`)}
       >
-        <div className="aspect-square overflow-hidden bg-accent">
-          {artist.image_url && !imgError ? (
-            <img
-              src={artist.image_url}
-              alt={artist.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div
-              className="flex h-full w-full items-center justify-center text-xl font-bold text-white/80"
-              style={{ background: getGradientForName(artist.name) }}
-            >
-              {getInitials(artist.name)}
-            </div>
-          )}
-        </div>
-        <div className="p-2.5">
-          <h3 className="truncate text-sm font-semibold text-card-foreground">
+        {artist.image_url && !imgError ? (
+          <img
+            src={artist.image_url}
+            alt={artist.name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center text-2xl font-light text-white/80"
+            style={{ background: getGradientForName(artist.name) }}
+          >
+            {getInitials(artist.name)}
+          </div>
+        )}
+        <div className="album-card-gradient absolute inset-0" />
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <h3 className="truncate text-sm font-medium text-white">
             {artist.name}
           </h3>
-          <Badge variant="secondary" className="mt-1 text-xs font-normal">
+          <p className="text-xs text-white/60">
             {formatPlays(artist.play_count)}
-          </Badge>
+          </p>
         </div>
-      </Card>
+      </div>
     </div>
   )
 }
@@ -237,10 +221,6 @@ function OnThisDaySection() {
         const day = now.getDate()
         const currentYear = now.getFullYear()
 
-        // Build date-range filters for the same calendar date in each previous year.
-        // Widen by ±1 day to account for timezone offset — scrobbles are stored in
-        // UTC, so e.g. "Feb 27 at 11pm Pacific" is "Feb 28 UTC". We filter
-        // client-side afterward by the user's local date.
         const yearFilters: string[] = []
         for (let y = currentYear - 1; y >= currentYear - 10; y--) {
           const prevDay = new Date(y, month - 1, day - 1)
@@ -253,8 +233,6 @@ function OnThisDaySection() {
         }
 
         const filter = yearFilters.join(' || ')
-        // Use getList instead of getFullList to avoid the implicit skipTotal: true
-        // that getFullList sets internally, which causes totalItems to be 0.
         const result = await pb
           .collection('scrobbles')
           .getList<ScrobbleExpanded>(1, 500, {
@@ -266,14 +244,11 @@ function OnThisDaySection() {
 
         if (cancelled) return
 
-        // Filter client-side: only keep scrobbles whose local date matches
-        // the target month/day (wider UTC window may include adjacent days).
         const matched = result.items.filter((s) => {
           const local = new Date(s.scrobbled_at)
           return local.getMonth() + 1 === month && local.getDate() === day
         })
 
-        // Group scrobbles by year, counting per year
         const byYear = new Map<number, ScrobbleExpanded[]>()
         for (const s of matched) {
           const year = new Date(s.scrobbled_at).getFullYear()
@@ -281,13 +256,11 @@ function OnThisDaySection() {
           byYear.get(year)!.push(s)
         }
 
-        // Pick the 2-3 years with the most scrobbles
         const sortedYears = Array.from(byYear.entries())
           .sort((a, b) => b[1].length - a[1].length)
           .slice(0, 3)
-          .sort((a, b) => b[0] - a[0]) // then order by year descending for display
+          .sort((a, b) => b[0] - a[0])
 
-        // For each year, group scrobbles by album and deduplicate
         const yearGroups = sortedYears.map(([year, scrobbles]) => {
           const seen = new Set<string>()
           const albums: OnThisDayAlbum[] = []
@@ -324,21 +297,15 @@ function OnThisDaySection() {
 
   if (loading) {
     return (
-      <section className="mb-8">
-        <div className="mb-3 flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">On This Day</h2>
+      <section className="mb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">On This Day</h2>
         </div>
         <ScrollRow>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="w-40 shrink-0">
-              <Card className="gap-0 overflow-hidden border-border/50 p-0">
-                <Skeleton className="aspect-square w-full rounded-none" />
-                <div className="space-y-2 p-2.5">
-                  <Skeleton className="h-3 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </Card>
+            <div key={i} className="w-44 shrink-0">
+              <Skeleton className="aspect-square w-full rounded-xl" />
             </div>
           ))}
         </ScrollRow>
@@ -347,10 +314,10 @@ function OnThisDaySection() {
   }
 
   return (
-    <section className="section-fade-in mb-8">
-      <div className="mb-3 flex items-center gap-2">
-        <Calendar className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">On This Day</h2>
+    <section className="section-fade-in mb-10">
+      <div className="mb-4 flex items-center gap-2">
+        <Calendar className="h-5 w-5 text-primary" strokeWidth={1.5} />
+        <h2 className="section-heading text-lg">On This Day</h2>
       </div>
       {groups.length === 0 ? (
         <EmptyState
@@ -360,7 +327,7 @@ function OnThisDaySection() {
       ) : (
         groups.map(({ year, albums }) => (
           <div key={year} className="mb-4">
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+            <h3 className="mb-2 text-sm font-light text-muted-foreground">
               {year}
             </h3>
             <ScrollRow>
@@ -379,45 +346,33 @@ function OnThisDayAlbumCard({ album }: { album: OnThisDayAlbum }) {
   const [imgError, setImgError] = useState(false)
 
   return (
-    <div className="w-40 shrink-0">
-      <Card className="group relative gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+    <div className="w-44 shrink-0">
+      <div className="card-hover group relative aspect-square overflow-hidden rounded-xl album-art-shadow-sm">
         <Link to={`/albums/${album.id}`}>
-          <div className="aspect-square overflow-hidden bg-accent">
-            {album.image_url && !imgError ? (
-              <img
-                src={album.image_url}
-                alt={album.title}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                onError={() => setImgError(true)}
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Disc3 className="h-8 w-8" strokeWidth={1.5} />
-              </div>
-            )}
-          </div>
-        </Link>
-        <div className="p-2.5">
-          <Link to={`/albums/${album.id}`}>
-            <h3 className="truncate text-sm font-semibold text-card-foreground">
+          {album.image_url && !imgError ? (
+            <img
+              src={album.image_url}
+              alt={album.title}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-accent text-muted-foreground">
+              <Disc3 className="h-10 w-10" strokeWidth={1.5} />
+            </div>
+          )}
+          <div className="album-card-gradient absolute inset-0" />
+          <div className="absolute bottom-0 left-0 right-0 p-3">
+            <h3 className="truncate text-sm font-medium text-white">
               {album.title}
             </h3>
-          </Link>
-          {album.artistId ? (
-            <Link
-              to={`/artists/${album.artistId}`}
-              className="mt-0.5 block truncate text-xs text-muted-foreground transition-colors hover:text-primary"
-            >
-              {album.artistName}
-            </Link>
-          ) : (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            <p className="truncate text-xs text-white/70">
               {album.artistName}
             </p>
-          )}
-        </div>
-      </Card>
+          </div>
+        </Link>
+      </div>
     </div>
   )
 }
@@ -445,7 +400,6 @@ function GenreDiveSection() {
           return
         }
 
-        // Pick a tag deterministically for the day
         const seed = getDailySeed()
         const idx = Math.floor(seededRandom(seed + 1) * tagsResult.items.length)
         const chosenTag = tagsResult.items[idx]
@@ -484,18 +438,16 @@ function GenreDiveSection() {
 
   if (loading) {
     return (
-      <section className="mb-8">
-        <div className="mb-3 flex items-center gap-2">
-          <TagIcon className="h-5 w-5 text-primary" />
+      <section className="mb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <TagIcon className="h-5 w-5 text-primary" strokeWidth={1.5} />
           <Skeleton className="h-6 w-48" />
         </div>
         <Skeleton className="mb-2 h-4 w-16" />
         <ScrollRow>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="w-36 shrink-0">
-              <Skeleton className="aspect-square w-full rounded-lg" />
-              <Skeleton className="mt-2 h-3 w-3/4" />
-              <Skeleton className="mt-1 h-3 w-12" />
+            <div key={i} className="w-40 shrink-0">
+              <Skeleton className="aspect-square w-full rounded-xl" />
             </div>
           ))}
         </ScrollRow>
@@ -505,10 +457,10 @@ function GenreDiveSection() {
 
   if (!tag) {
     return (
-      <section className="section-fade-in mb-8">
-        <div className="mb-3 flex items-center gap-2">
-          <TagIcon className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Today&apos;s Genre</h2>
+      <section className="section-fade-in mb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <TagIcon className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Today&apos;s Genre</h2>
         </div>
         <EmptyState
           icon={TagIcon}
@@ -519,10 +471,10 @@ function GenreDiveSection() {
   }
 
   return (
-    <section className="section-fade-in mb-8">
-      <div className="mb-3 flex items-center gap-2">
-        <TagIcon className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Today&apos;s Genre:</h2>
+    <section className="section-fade-in mb-10">
+      <div className="mb-4 flex items-center gap-2">
+        <TagIcon className="h-5 w-5 text-primary" strokeWidth={1.5} />
+        <h2 className="section-heading text-lg">Today&apos;s Genre:</h2>
         <Link to={`/tags/${tag.id}`}>
           <Badge className="cursor-pointer">{tag.name}</Badge>
         </Link>
@@ -530,8 +482,8 @@ function GenreDiveSection() {
 
       {artists.length > 0 && (
         <>
-          <p className="mb-2 text-sm text-muted-foreground">Artists</p>
-          <ScrollRow className="mb-4">
+          <p className="mb-2 text-sm font-light text-muted-foreground">Artists</p>
+          <ScrollRow className="mb-5">
             {artists.map(artist => (
               <MiniArtistCard key={artist.id} artist={artist} />
             ))}
@@ -541,7 +493,7 @@ function GenreDiveSection() {
 
       {albums.length > 0 && (
         <>
-          <p className="mb-2 text-sm text-muted-foreground">Albums</p>
+          <p className="mb-2 text-sm font-light text-muted-foreground">Albums</p>
           <ScrollRow>
             {albums.map(album => (
               <MiniAlbumCard key={album.id} album={album} />
@@ -575,7 +527,6 @@ function DeepCutsSection() {
         if (cancelled) return
 
         const items = result.items
-        // Middle tier: skip top 20 %, take the next 60 %
         const start = Math.floor(items.length * 0.2)
         const end = Math.floor(items.length * 0.8)
         const middleTier = items.slice(start, end)
@@ -598,25 +549,18 @@ function DeepCutsSection() {
 
   if (loading) {
     return (
-      <section className="mb-8">
+      <section className="mb-10">
         <div className="mb-1 flex items-center gap-2">
-          <Disc3 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Deep Cuts</h2>
+          <Disc3 className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Deep Cuts</h2>
         </div>
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm font-light text-muted-foreground">
           Albums you liked but might have forgotten
         </p>
         <ScrollRow>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="w-40 shrink-0">
-              <Card className="gap-0 overflow-hidden border-border/50 p-0">
-                <Skeleton className="aspect-square w-full rounded-none" />
-                <div className="space-y-2 p-3">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
-              </Card>
+            <div key={i} className="w-44 shrink-0">
+              <Skeleton className="aspect-square w-full rounded-xl" />
             </div>
           ))}
         </ScrollRow>
@@ -626,12 +570,12 @@ function DeepCutsSection() {
 
   if (albums.length === 0) {
     return (
-      <section className="section-fade-in mb-8">
+      <section className="section-fade-in mb-10">
         <div className="mb-1 flex items-center gap-2">
-          <Disc3 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Deep Cuts</h2>
+          <Disc3 className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Deep Cuts</h2>
         </div>
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm font-light text-muted-foreground">
           Albums you liked but might have forgotten
         </p>
         <EmptyState
@@ -643,12 +587,12 @@ function DeepCutsSection() {
   }
 
   return (
-    <section className="section-fade-in mb-8">
+    <section className="section-fade-in mb-10">
       <div className="mb-1 flex items-center gap-2">
-        <Disc3 className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Deep Cuts</h2>
+        <Disc3 className="h-5 w-5 text-primary" strokeWidth={1.5} />
+        <h2 className="section-heading text-lg">Deep Cuts</h2>
       </div>
-      <p className="mb-3 text-sm text-muted-foreground">
+      <p className="mb-4 text-sm font-light text-muted-foreground">
         Albums you liked but might have forgotten
       </p>
       <ScrollRow>
@@ -703,20 +647,18 @@ function ForgottenFavoritesSection() {
 
   if (loading) {
     return (
-      <section className="mb-8">
+      <section className="mb-10">
         <div className="mb-1 flex items-center gap-2">
-          <Heart className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Forgotten Favorites</h2>
+          <Heart className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Forgotten Favorites</h2>
         </div>
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm font-light text-muted-foreground">
           Artists you haven&apos;t played lately
         </p>
         <ScrollRow>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="w-36 shrink-0">
-              <Skeleton className="aspect-square w-full rounded-lg" />
-              <Skeleton className="mt-2 h-4 w-3/4" />
-              <Skeleton className="mt-1 h-3 w-12" />
+            <div key={i} className="w-40 shrink-0">
+              <Skeleton className="aspect-square w-full rounded-xl" />
             </div>
           ))}
         </ScrollRow>
@@ -726,12 +668,12 @@ function ForgottenFavoritesSection() {
 
   if (artists.length === 0) {
     return (
-      <section className="section-fade-in mb-8">
+      <section className="section-fade-in mb-10">
         <div className="mb-1 flex items-center gap-2">
-          <Heart className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Forgotten Favorites</h2>
+          <Heart className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Forgotten Favorites</h2>
         </div>
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm font-light text-muted-foreground">
           Artists you haven&apos;t played lately
         </p>
         <EmptyState
@@ -743,12 +685,12 @@ function ForgottenFavoritesSection() {
   }
 
   return (
-    <section className="section-fade-in mb-8">
+    <section className="section-fade-in mb-10">
       <div className="mb-1 flex items-center gap-2">
-        <Heart className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Forgotten Favorites</h2>
+        <Heart className="h-5 w-5 text-primary" strokeWidth={1.5} />
+        <h2 className="section-heading text-lg">Forgotten Favorites</h2>
       </div>
-      <p className="mb-3 text-sm text-muted-foreground">
+      <p className="mb-4 text-sm font-light text-muted-foreground">
         Artists you haven&apos;t played lately
       </p>
       <ScrollRow>
@@ -760,7 +702,7 @@ function ForgottenFavoritesSection() {
   )
 }
 
-/* ── Section: Featured Albums (was "Spin the Wheel") ── */
+/* ── Section: Featured Albums — cinematic hero content ── */
 
 function FeaturedAlbumCard({ album }: { album: AlbumWithArtist }) {
   const [imgError, setImgError] = useState(false)
@@ -768,49 +710,43 @@ function FeaturedAlbumCard({ album }: { album: AlbumWithArtist }) {
   const copyText = `${artist?.name ?? 'Unknown artist'} - ${album.title}`
 
   return (
-    <div className="w-[200px] shrink-0 md:w-[250px]">
-      <Card className="group relative gap-0 overflow-hidden border-border/50 p-0 transition-colors hover:border-primary/40 hover:bg-accent">
+    <div className="w-[260px] shrink-0 md:w-[300px]">
+      <div className="card-hover group relative aspect-[4/5] overflow-hidden rounded-xl album-art-shadow">
         <Link to={`/albums/${album.id}`}>
-          <div className="aspect-square overflow-hidden bg-accent">
-            {album.image_url && !imgError ? (
-              <img
-                src={album.image_url}
-                alt={album.title}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                onError={() => setImgError(true)}
-                loading="lazy"
-              />
+          {album.image_url && !imgError ? (
+            <img
+              src={album.image_url}
+              alt={album.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-accent text-muted-foreground">
+              <Disc3 className="h-14 w-14" strokeWidth={1.5} />
+            </div>
+          )}
+          <div className="album-card-gradient absolute inset-0" />
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <h3 className="text-base font-semibold text-white drop-shadow-lg">
+              {album.title}
+            </h3>
+            {artist ? (
+              <p className="mt-0.5 text-sm text-white/70">
+                {artist.name}
+              </p>
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Disc3 className="h-10 w-10" strokeWidth={1.5} />
-              </div>
+              <p className="mt-0.5 text-sm text-white/50">
+                Unknown artist
+              </p>
             )}
+            <span className="mt-1.5 inline-block text-xs text-white/50">
+              {formatPlays(album.play_count)}
+            </span>
           </div>
         </Link>
         <CopyButton text={copyText} />
-        <div className="p-3">
-          <Link to={`/albums/${album.id}`}>
-            <h3 className="truncate text-sm font-semibold text-card-foreground">
-              {album.title}
-            </h3>
-          </Link>
-          {artist ? (
-            <Link
-              to={`/artists/${artist.id}`}
-              className="mt-0.5 block truncate text-xs text-muted-foreground transition-colors hover:text-primary"
-            >
-              {artist.name}
-            </Link>
-          ) : (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              Unknown artist
-            </p>
-          )}
-          <Badge variant="secondary" className="mt-1.5 text-xs font-normal">
-            {formatPlays(album.play_count)}
-          </Badge>
-        </div>
-      </Card>
+      </div>
     </div>
   )
 }
@@ -860,22 +796,15 @@ function FeaturedAlbumsSection() {
 
   if (loading) {
     return (
-      <section className="mb-8">
-        <div className="mb-3 flex items-center gap-2">
-          <Shuffle className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Featured Albums</h2>
+      <section className="mb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <Shuffle className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Featured Albums</h2>
         </div>
         <ScrollRow>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="w-[200px] shrink-0 md:w-[250px]">
-              <Card className="gap-0 overflow-hidden border-border/50 p-0">
-                <Skeleton className="aspect-square w-full rounded-none" />
-                <div className="space-y-2 p-3">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
-              </Card>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-[260px] shrink-0 md:w-[300px]">
+              <Skeleton className="aspect-[4/5] w-full rounded-xl" />
             </div>
           ))}
         </ScrollRow>
@@ -885,10 +814,10 @@ function FeaturedAlbumsSection() {
 
   if (albums.length === 0) {
     return (
-      <section className="section-fade-in mb-8">
-        <div className="mb-3 flex items-center gap-2">
-          <Shuffle className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Featured Albums</h2>
+      <section className="section-fade-in mb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <Shuffle className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <h2 className="section-heading text-lg">Featured Albums</h2>
         </div>
         <EmptyState
           icon={Shuffle}
@@ -899,14 +828,14 @@ function FeaturedAlbumsSection() {
   }
 
   return (
-    <section className="section-fade-in mb-8">
-      <div className="mb-3 flex items-center gap-2">
-        <Shuffle className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Featured Albums</h2>
+    <section className="section-fade-in mb-10">
+      <div className="mb-4 flex items-center gap-2">
+        <Shuffle className="h-5 w-5 text-primary" strokeWidth={1.5} />
+        <h2 className="section-heading text-lg">Featured Albums</h2>
         <Button
           variant="ghost"
           size="icon"
-          className="ml-auto h-8 w-8"
+          className="ml-auto h-8 w-8 text-muted-foreground hover:text-primary"
           onClick={handleShuffle}
         >
           <Shuffle className="h-4 w-4" />
@@ -935,10 +864,10 @@ export default function DiscoverPage() {
   const location = useLocation()
 
   return (
-    <div className="p-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Daily Discovery</h1>
-        <p className="text-muted-foreground">{formatTodayHeader()}</p>
+    <div className="px-4 py-6">
+      <div className="mb-8">
+        <h1 className="page-title text-3xl">Daily Discovery</h1>
+        <p className="mt-1 text-sm font-light text-muted-foreground">{formatTodayHeader()}</p>
       </div>
 
       <FeaturedAlbumsSection key={'fa-' + location.key} />

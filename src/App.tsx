@@ -15,20 +15,20 @@ import PageTransition from '@/components/PageTransition'
 import usePullToRefresh from '@/hooks/usePullToRefresh'
 import ScrollToTop from '@/components/ScrollToTop'
 
-function NavItem({ path, label, icon: Icon }: { path: string; label: string; icon: React.ComponentType<{ className?: string }> }) {
+function NavItem({ path, label, icon: Icon }: { path: string; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }> }) {
   return (
     <NavLink
       to={path}
       className={({ isActive }) =>
         cn(
-          'flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors',
+          'flex flex-col items-center gap-1 px-3 py-2 text-[10px] tracking-wide transition-colors',
           isActive
             ? 'text-primary'
-            : 'text-muted-foreground hover:text-foreground',
+            : 'text-[#555] hover:text-foreground',
         )
       }
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="h-5 w-5" strokeWidth={1.5} />
       <span>{label}</span>
     </NavLink>
   )
@@ -67,7 +67,7 @@ export default function App() {
         </PageTransition>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 flex justify-around border-t border-border bg-card safe-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 flex justify-around border-t border-[#2a2a2a] bg-[#121212]/95 backdrop-blur-sm safe-bottom">
         <NavItem path="/artists" label="Artists" icon={User} />
         <NavItem path="/albums" label="Albums" icon={Disc3} />
         <NavItem path="/discover" label="Discover" icon={Compass} />
