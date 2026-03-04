@@ -13,6 +13,10 @@ dist-ssr
 *.local
 .env
 
+# Deploy artifacts
+web/dist/
+web/.nostalge-client-src/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
