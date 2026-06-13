@@ -37,7 +37,7 @@ jobs:
         env:
           # The PocketBase URL is a LAN address baked into the client at
           # build time. Override via a repo variable if it ever changes.
-          PUBLIC_POCKETBASE_URL: ${{ vars.PUBLIC_POCKETBASE_URL || 'http://192.168.86.141:8095' }}
+          PUBLIC_POCKETBASE_URL: ${{ vars.PUBLIC_POCKETBASE_URL || 'http://192.168.68.52:8095' }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
