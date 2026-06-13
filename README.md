@@ -36,6 +36,19 @@ All PocketBase reads pass `{ requestKey: null }`, use paginated `getList()` (not
 `getFullList()`), and are wrapped in try/catch that fails silently. See
 `src/lib/pb.ts`, `src/lib/cache.ts` and `src/lib/useLibrary.ts`.
 
+## Installable (PWA)
+
+The app ships a web manifest and a Workbox service worker (`@vite-pwa/astro`),
+so on **Android / Chromium** you can "Add to home screen" for a standalone,
+full-screen experience. An **Install** button appears in the masthead when the
+browser reports the app is installable. The service worker precaches the app
+shell (launches offline) and runtime-caches cover art so artwork survives
+off-network. iOS isn't a target for now.
+
+The manifest link and SW registration are wired explicitly in
+`src/layouts/Layout.astro` (base-path aware), since vite-plugin-pwa's
+auto-injection doesn't run against Astro's generated pages.
+
 ## Prerequisites
 
 - The [music-cms-mvp](https://github.com/mclachlanr/music-cms-mvp) backend
