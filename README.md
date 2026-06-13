@@ -67,7 +67,7 @@ npm install
 Point the app at your PocketBase instance (use your server's LAN IP):
 
 ```bash
-echo 'PUBLIC_POCKETBASE_URL=http://192.168.86.141:8095' > .env
+echo 'PUBLIC_POCKETBASE_URL=http://192.168.68.52:8095' > .env
 ```
 
 > The variable is `PUBLIC_`-prefixed so Astro exposes it to the client bundle.
@@ -95,10 +95,11 @@ npm run check      # astro check (type checking)
 `astro.config.mjs` sets `output: 'static'` and `base: '/nostalge-client'` so
 assets resolve under `https://<user>.github.io/nostalge-client/`.
 
-`.github/workflows/deploy.yml` builds on push to `main` and publishes `./dist`
-to the `gh-pages` branch (a `.nojekyll` file is emitted so GitHub Pages serves
-the `_astro/` directory). The build reads `PUBLIC_POCKETBASE_URL` from a repo
-variable of the same name, falling back to the bundled LAN address.
+`.github/workflows/deploy.yml` builds on push to `main` and deploys via the
+official GitHub Pages action (`actions/deploy-pages`), so the repo's
+**Settings → Pages → Source** must be set to **"GitHub Actions"**. The build
+reads `PUBLIC_POCKETBASE_URL` from a repo variable of the same name, falling
+back to the bundled LAN address.
 
 ## Project structure
 
