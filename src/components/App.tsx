@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useLibrary } from '@/lib/useLibrary'
 import { cn } from '@/lib/cn'
 import { BottomNav, type Tab } from './BottomNav'
+import { InstallButton } from './InstallButton'
 import { RefreshIcon } from './icons'
 import { CratesTab } from './crates/CratesTab'
 import { ArtistDetail } from './crates/ArtistDetail'
@@ -124,14 +125,17 @@ function Masthead({
         </div>
         <div className="flex flex-col items-end gap-2">
           <ConnectionFlag connection={connection} syncing={syncing} />
-          <button
-            onClick={onRefresh}
-            disabled={syncing}
-            aria-label="Refresh from server"
-            className="btn-press grid h-9 w-9 place-items-center disabled:opacity-50"
-          >
-            <RefreshIcon className={cn('h-4 w-4', syncing && 'animate-spin')} />
-          </button>
+          <div className="flex items-center gap-2">
+            <InstallButton />
+            <button
+              onClick={onRefresh}
+              disabled={syncing}
+              aria-label="Refresh from server"
+              className="btn-press grid h-9 w-9 place-items-center disabled:opacity-50"
+            >
+              <RefreshIcon className={cn('h-4 w-4', syncing && 'animate-spin')} />
+            </button>
+          </div>
         </div>
       </div>
     </header>
