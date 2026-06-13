@@ -1,165 +1,111 @@
 # nostalge-client
 
-A responsive PWA for browsing your Last.fm music library, powered by a self-hosted PocketBase backend.
+A mobile-first web app for **rediscovering your own record collection** — built
+to feel like flipping through the crates at an independent record store rather
+than scrolling a streaming app.
 
-Built with React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
+It reads from a self-hosted [PocketBase](https://pocketbase.io) backend that
+lives on your home network. When that backend is reachable it pulls fresh data
+and caches it locally; when it isn't, the app loads instantly from the cache and
+degrades gracefully — it never shows a broken or error state.
+
+Built with **Astro** (static output) + **React islands**, **TypeScript**, and
+**Tailwind CSS**. The design system is hand-rolled — no UI component libraries.
+
+## The four crates
+
+- **Crates** — browse every artist as a card (album art or a generated
+  initials placeholder), search client-side, then dig into an artist's sleeves
+  and an album's tracklist, plays and "last spun" date.
+- **Discovery** — *Forgotten Gems* (played before, but not in the last 6 months)
+  and *Blind Spot* (filed away, never played).
+- **Tags** — the collection sorted by genre / mood / era, shown as handwritten
+  divider cards.
+- **Stats** — big typographic numbers: top artists, top albums, busiest month.
+
+## Data layer
+
+On load the app:
+
+1. Surfaces whatever is cached in `localStorage` immediately (works offline).
+2. Runs a fast `/api/health` probe against PocketBase.
+3. If it answers, fetches artists, albums, tags and recent plays, replaces the
+   cache, and re-renders. If it doesn't, it silently keeps the cached view.
+
+All PocketBase reads pass `{ requestKey: null }`, use paginated `getList()` (not
+`getFullList()`), and are wrapped in try/catch that fails silently. See
+`src/lib/pb.ts`, `src/lib/cache.ts` and `src/lib/useLibrary.ts`.
 
 ## Prerequisites
 
-- The [music-cms-mvp](https://github.com/mclachlanr/music-cms-mvp) backend running on your local network (PocketBase + sync service)
-- Node.js 18+
-- Your PocketBase instance must have port `8090` exposed and public read access enabled on all collections
+- The [music-cms-mvp](https://github.com/mclachlanr/music-cms-mvp) backend
+  running on your local network, with public read access enabled on the
+  `artists`, `albums`, `tracks`, `scrobbles` and `tags` collections.
+- Node.js 20+
 
 ## Setup
 
-Clone the repo and install dependencies:
-
 ```bash
-git clone https://github.com/mclachlanr/nostalge-client.git
+git clone https://github.com/rossmclachlan/nostalge-client.git
 cd nostalge-client
 npm install
 ```
 
-Create a `.env` file pointing to your PocketBase instance. Replace the IP with your server's local IP address:
+Point the app at your PocketBase instance (use your server's LAN IP):
 
 ```bash
-echo 'VITE_POCKETBASE_URL=http://192.168.86.141:8095' > .env
+echo 'PUBLIC_POCKETBASE_URL=http://192.168.86.141:8095' > .env
 ```
 
-To find your server's IP, run `hostname -I` on the machine running PocketBase.
+> The variable is `PUBLIC_`-prefixed so Astro exposes it to the client bundle.
 
-## Verifying the backend
-
-Before starting the client, confirm PocketBase is reachable and has data.
-
-### 1. Health check
+## Development
 
 ```bash
-curl http://192.168.86.141:8095/api/health
+npm run dev            # http://localhost:4321/nostalge-client
+npm run dev -- --host  # expose on your LAN to test on a phone
 ```
 
-You should get back:
+The app loads even with no backend reachable — you'll see empty/welcome screens
+until data syncs.
 
-```json
-{"code":200,"message":"API is healthy."}
-```
-
-If this fails, check that port `8095` is mapped in your `docker-compose.yml`:
-
-```yaml
-pocketbase:
-  ports:
-    - "8095:8090"
-```
-
-Then restart your containers with `sudo docker compose up -d`.
-
-### 2. Enable public read access
-
-The PWA reads data without authentication, so all collections need public read rules. SSH into your server and run:
+## Build & preview
 
 ```bash
-cd /volume1/docker/music-cms
-export $(grep -v '^#' .env | xargs)
-
-TOKEN=$(curl -s -X POST http://localhost:8095/api/admins/auth-with-password \
-  -H "Content-Type: application/json" \
-  -d '{"identity":"'"$POCKETBASE_ADMIN_EMAIL"'","password":"'"$POCKETBASE_ADMIN_PASSWORD"'"}' | \
-  python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-
-for col in artists albums tracks scrobbles sync_jobs; do
-  curl -s -X PATCH "http://localhost:8095/api/collections/$col" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Content-Type: application/json" \
-    -d '{"listRule":"","viewRule":""}' > /dev/null
-  echo "$col: public read enabled"
-done
+npm run build      # static output to ./dist
+npm run preview
+npm run check      # astro check (type checking)
 ```
 
-### 3. Check collections have data
+## Deployment (GitHub Pages)
 
-```bash
-# Artists (should return paginated results)
-curl -s "http://192.168.86.141:8095/api/collections/artists/records?perPage=1" | python3 -m json.tool
+`astro.config.mjs` sets `output: 'static'` and `base: '/nostalge-client'` so
+assets resolve under `https://<user>.github.io/nostalge-client/`.
 
-# Albums
-curl -s "http://192.168.86.141:8095/api/collections/albums/records?perPage=1" | python3 -m json.tool
-
-# Tracks
-curl -s "http://192.168.86.141:8095/api/collections/tracks/records?perPage=1" | python3 -m json.tool
-```
-
-Each response should include a `totalItems` count and at least one record in the `items` array. If you get a 403 error, public read access hasn't been enabled — see the backend repo for the setup script.
-
-### 4. Check CORS
-
-Open a browser console on any page and run:
-
-```javascript
-fetch('http://192.168.86.141:8095/api/health')
-  .then(r => r.json())
-  .then(console.log)
-  .catch(console.error)
-```
-
-If you see a CORS error, you may need to adjust PocketBase's allowed origins. By default PocketBase allows all origins, so this should work out of the box.
-
-## Running the dev server
-
-```bash
-npm run dev
-```
-
-This starts Vite on `http://localhost:5173`. To access from other devices on your network (e.g. testing on your phone):
-
-```bash
-npm run dev -- --host
-```
-
-This exposes the dev server on your local IP, e.g. `http://192.168.86.141:5173`.
-
-## Verifying the app
-
-Once the dev server is running:
-
-1. Open the app in your browser — you should see the Artists grid populated with images and play counts
-2. Try searching for an artist by name
-3. Tap an artist to see their detail page with albums, bio, and tags
-4. Navigate to the Albums and Activity tabs
-5. On mobile, check that the bottom navigation works and the layout is responsive
-
-### Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| Blank page, no data | Open browser DevTools → Network tab. Check for failed requests to your PocketBase URL. Verify `.env` has the correct IP. |
-| `ERR_CONNECTION_REFUSED` | PocketBase isn't running or port 8095 isn't exposed. Run `sudo docker compose ps` to check container status. |
-| `ERR_NAME_NOT_RESOLVED` | You're using a hostname that can't be resolved. Use the IP address directly. |
-| Data loads but images are broken | Album/artist images come from Last.fm CDN. Check your network connection. Missing images will show a placeholder. |
-| 403 "Only admins can perform this action" | Public read access not enabled. Run the public read script in step 2 above. |
-| CORS errors in console | Shouldn't happen with default PocketBase config. Check that you're using `http://` not `https://` for local connections. |
-
-## Building for production
-
-```bash
-npm run build
-```
-
-The built files go to `dist/`. For GitHub Pages deployment, the repo includes a GitHub Actions workflow that builds and deploys on push to `main`.
+`.github/workflows/deploy.yml` builds on push to `main` and publishes `./dist`
+to the `gh-pages` branch (a `.nojekyll` file is emitted so GitHub Pages serves
+the `_astro/` directory). The build reads `PUBLIC_POCKETBASE_URL` from a repo
+variable of the same name, falling back to the bundled LAN address.
 
 ## Project structure
 
 ```
 src/
-├── components/     # Reusable UI components
-├── lib/            # PocketBase client, utilities
-├── pages/          # Route pages (Artists, Albums, Activity, etc.)
-└── App.tsx         # Router and layout
+├── components/        # React islands + the design system
+│   ├── App.tsx        # root island: tabs + navigation stack
+│   ├── crates/        # Crates tab, artist & album detail
+│   ├── discovery/     # Forgotten Gems / Blind Spot
+│   ├── tags/          # tag index + tag detail
+│   └── stats/         # listening stats
+├── lib/               # data layer: pb, cache, useLibrary, derive, format
+├── layouts/Layout.astro
+├── pages/index.astro  # mounts the App island
+└── styles/global.css  # zine/record-store design tokens
 ```
 
 ## Stack
 
-- **React 18** + TypeScript
-- **Vite** with vite-plugin-pwa
-- **Tailwind CSS** + **shadcn/ui**
-- **PocketBase JS SDK** 0.21.5
+- **Astro 5** (`output: 'static'`) + **@astrojs/react**
+- **React 18** islands + TypeScript
+- **Tailwind CSS 4** (via `@tailwindcss/vite`)
+- **PocketBase JS SDK** 0.21

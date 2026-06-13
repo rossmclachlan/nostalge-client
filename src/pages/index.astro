@@ -1,0 +1,19 @@
+---
+import Layout from '../layouts/Layout.astro'
+import App from '../components/App.tsx'
+---
+
+<Layout>
+  <!--
+    The whole experience is interactive (tab state, search, localStorage),
+    so we mount one React island for the app shell. client:only keeps it
+    purely client-side — no SSR, which suits the offline-graceful data layer
+    and a fully static GitHub Pages build.
+  -->
+  <App client:only="react">
+    <!-- Shown until the island hydrates; replaced by the React tree. -->
+    <div slot="fallback" class="grid min-h-dvh place-items-center p-8">
+      <p class="label text-ink-3">flipping through the crates…</p>
+    </div>
+  </App>
+</Layout>

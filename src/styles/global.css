@@ -1,0 +1,196 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------ */
+/*  NOSTALGE — design tokens                                          */
+/*  Independent record store meets DIY zine. Kraft paper, riso ink,   */
+/*  hand-cut flyers, faded photocopier toner.                         */
+/* ------------------------------------------------------------------ */
+@theme {
+  /* Paper & ink */
+  --color-paper: #f1e7d0;
+  --color-paper-2: #e8dbbd;
+  --color-paper-3: #ddcca4;
+  --color-kraft: #c7a877;
+  --color-ink: #1b1712;
+  --color-ink-2: #3a342b;
+  --color-ink-3: #6b6353;
+
+  /* Risograph accents */
+  --color-riso-red: #c83f2b;
+  --color-riso-olive: #5f6a2c;
+  --color-riso-yellow: #edb22a;
+  --color-riso-blue: #2f5d6b;
+
+  /* Type */
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-body: 'Archivo', 'Helvetica Neue', system-ui, sans-serif;
+
+  /* Hard, photocopied edges — almost no rounding */
+  --radius-sticker: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                              */
+/* ------------------------------------------------------------------ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    background-color: var(--color-ink);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    background-color: var(--color-paper);
+    /* Layered paper grain + faded toner blotches */
+    background-image:
+      radial-gradient(
+        circle at 20% 15%,
+        rgba(95, 106, 44, 0.06),
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 85% 80%,
+        rgba(200, 63, 43, 0.05),
+        transparent 45%
+      ),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: var(--color-riso-yellow);
+    color: var(--color-ink);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 0.92;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reusable zine components                                          */
+/* ------------------------------------------------------------------ */
+@layer components {
+  /* Big stamped section header */
+  .stamp-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 14vw, 4.25rem);
+    line-height: 0.85;
+    color: var(--color-ink);
+    text-transform: uppercase;
+  }
+
+  /* Tight tracked metadata label, small caps feel */
+  .label {
+    font-family: var(--font-body);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* A flyer / record-sleeve card: hard border, drop shadow like it's */
+  /* pinned to a corkboard, with a touch of paper grain on top.        */
+  .flyer {
+    position: relative;
+    background-color: var(--color-paper-2);
+    border: 1.5px solid var(--color-ink);
+    border-radius: var(--radius-sticker);
+    box-shadow: 3px 4px 0 0 rgba(27, 23, 18, 0.85);
+  }
+
+  /* Toner / age overlay applied with mix-blend so colours sit under it */
+  .aged::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+
+  /* Hand-written price-sticker blob */
+  .price-sticker {
+    font-family: var(--font-display);
+    background: var(--color-riso-yellow);
+    color: var(--color-ink);
+    border: 1.5px solid var(--color-ink);
+    padding: 0.05rem 0.45rem;
+    transform: rotate(-3deg);
+    box-shadow: 1px 1px 0 0 rgba(27, 23, 18, 0.7);
+  }
+
+  /* A button that feels pressed: it sits on a hard shadow, and the    */
+  /* shadow collapses when you push it down.                           */
+  .btn-press {
+    font-family: var(--font-body);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border: 1.5px solid var(--color-ink);
+    border-radius: var(--radius-sticker);
+    box-shadow: 2px 2px 0 0 var(--color-ink);
+    transition:
+      transform 90ms ease,
+      box-shadow 90ms ease,
+      background-color 90ms ease;
+  }
+  .btn-press:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 0 var(--color-ink);
+  }
+
+  /* Cardboard crate divider — the handwritten genre cards */
+  .divider-card {
+    position: relative;
+    background: var(--color-paper-3);
+    border: 1.5px solid var(--color-ink);
+    border-left-width: 8px;
+    border-radius: var(--radius-sticker);
+    box-shadow: 2px 3px 0 0 rgba(27, 23, 18, 0.8);
+    transition:
+      transform 90ms ease,
+      box-shadow 90ms ease;
+  }
+  .divider-card:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 1px 0 0 rgba(27, 23, 18, 0.8);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                         */
+/* ------------------------------------------------------------------ */
+@layer utilities {
+  .tracking-tightest {
+    letter-spacing: -0.03em;
+  }
+  /* slight randomised tilts for that hand-pinned look */
+  .tilt-l {
+    transform: rotate(-1.2deg);
+  }
+  .tilt-r {
+    transform: rotate(1.1deg);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
+  }
+}

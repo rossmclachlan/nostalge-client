@@ -13,9 +13,8 @@ dist-ssr
 *.local
 .env
 
-# Deploy artifacts
-web/dist/
-web/.nostalge-client-src/
+# Astro
+.astro/
 
 # Editor directories and files
 .vscode/*
