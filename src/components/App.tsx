@@ -26,7 +26,7 @@ const TAB_TITLES: Record<Tab, string> = {
 
 export default function App() {
   const { data, connection, syncing, refresh } = useLibrary()
-  const [tab, setTab] = useState<Tab>('crates')
+  const [tab, setTab] = useState<Tab>('discovery')
   const [stack, setStack] = useState<Detail[]>([])
 
   const push = useCallback((d: Detail) => setStack((s) => [...s, d]), [])
