@@ -61,3 +61,16 @@ export const RefreshIcon = (p: P) => (
     <path d="M21 12a9 9 0 1 1-2.6-6.3M21 4v5h-5" />
   </svg>
 )
+
+export const CopyIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="9" y="9" width="11" height="11" rx="1.5" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </svg>
+)
+
+export const CheckIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M5 12.5 10 17.5 19 6.5" />
+  </svg>
+)
