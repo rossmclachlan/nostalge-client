@@ -11,6 +11,7 @@ import { DiscoveryTab } from './discovery/DiscoveryTab'
 import { TagsTab } from './tags/TagsTab'
 import { TagDetail } from './tags/TagDetail'
 import { StatsTab } from './stats/StatsTab'
+import { RecentTab } from './recent/RecentTab'
 
 type Detail =
   | { kind: 'artist'; id: string }
@@ -22,6 +23,7 @@ const TAB_TITLES: Record<Tab, string> = {
   discovery: 'Discovery',
   tags: 'Tags',
   stats: 'Stats',
+  recent: 'Recent',
 }
 
 export default function App() {
@@ -96,6 +98,7 @@ export default function App() {
             {tab === 'stats' && (
               <StatsTab data={data} onOpenArtist={openArtist} onOpenAlbum={openAlbum} />
             )}
+            {tab === 'recent' && <RecentTab />}
           </main>
         </>
       )}

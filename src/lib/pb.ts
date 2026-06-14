@@ -1,5 +1,5 @@
 import PocketBase from 'pocketbase'
-import type { Album, Artist, PlayEvent, Scrobble, Tag, Track } from './types'
+import type { Album, Artist, PlayEvent, RecentPlay, Scrobble, Tag, Track } from './types'
 
 /**
  * PocketBase lives on the home LAN and is only reachable some of the time.
@@ -97,6 +97,30 @@ export async function fetchTracksForAlbum(albumId: string): Promise<Track[]> {
       requestKey: null,
     })
     return result.items
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Most recent scrobbles with display details, newest first. Used by the
+ * Recent tab as a live "is the NAS still scrobbling?" check. Returns [] when
+ * offline or on any error.
+ */
+export async function fetchRecentPlays(limit = 100): Promise<RecentPlay[]> {
+  try {
+    const res = await pb.collection('scrobbles').getList<ScrobbleExpanded>(1, limit, {
+      sort: '-scrobbled_at',
+      expand: 'track,track.artist,track.album',
+      requestKey: null,
+    })
+    return res.items.map((s) => ({
+      id: s.id,
+      track: s.expand?.track?.title ?? 'Unknown track',
+      artist: s.expand?.track?.expand?.artist?.name ?? '',
+      album: s.expand?.track?.expand?.album?.title ?? '',
+      at: s.scrobbled_at,
+    }))
   } catch {
     return []
   }

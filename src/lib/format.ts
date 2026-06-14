@@ -56,6 +56,28 @@ export function relativeAge(iso: string): string {
   return years === 1 ? 'a year ago' : `${years} years ago`
 }
 
+/** Local clock time, e.g. "14:32". */
+export function clockTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+/** A day heading: "Today" / "Yesterday" / "Mon 14 Jun". */
+export function dayHeading(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'Unknown'
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const days = Math.round((startOf(new Date()) - startOf(d)) / 86_400_000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 /** Strip HTML tags down to a plain-text excerpt (for Last.fm bios). */
 export function plainText(html: string, max = 240): string {
   const text = html
