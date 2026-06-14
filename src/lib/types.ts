@@ -64,6 +64,16 @@ export interface PlayEvent {
   at: string
 }
 
+/** A recent scrobble with display details, for the Recent tab / sync check. */
+export interface RecentPlay {
+  id: string
+  track: string
+  artist: string
+  album: string
+  /** ISO timestamp the track was scrobbled */
+  at: string
+}
+
 export interface MusicData {
   artists: Artist[]
   albums: Album[]

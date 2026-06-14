@@ -62,6 +62,13 @@ export const RefreshIcon = (p: P) => (
   </svg>
 )
 
+export const ClockIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3.5 2" />
+  </svg>
+)
+
 export const CopyIcon = (p: P) => (
   <svg {...base(p)}>
     <rect x="9" y="9" width="11" height="11" rx="1.5" />
