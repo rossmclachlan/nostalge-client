@@ -4,8 +4,8 @@ import { ChartIcon, CompassIcon, CrateIcon, TagIcon } from './icons'
 export type Tab = 'crates' | 'discovery' | 'tags' | 'stats'
 
 const ITEMS: { id: Tab; label: string; Icon: typeof CrateIcon }[] = [
-  { id: 'discovery', label: 'Discover', Icon: CompassIcon },
   { id: 'crates', label: 'Crates', Icon: CrateIcon },
+  { id: 'discovery', label: 'Discover', Icon: CompassIcon },
   { id: 'tags', label: 'Tags', Icon: TagIcon },
   { id: 'stats', label: 'Stats', Icon: ChartIcon },
 ]

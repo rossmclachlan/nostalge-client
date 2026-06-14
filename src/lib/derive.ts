@@ -31,33 +31,6 @@ function artistNameMap(artists: Artist[]): Map<string, string> {
   return new Map(artists.map((a) => [a.id, a.name]))
 }
 
-/** Deterministic shuffle (Fisher–Yates seeded with mulberry32). A given
- *  seed always yields the same order, so the picks stay stable while the
- *  tab is open and only change when the seed is re-rolled. */
-function seededShuffle<T>(input: T[], seed: number): T[] {
-  const arr = [...input]
-  let s = seed >>> 0
-  const rand = () => {
-    s |= 0
-    s = (s + 0x6d2b79f5) | 0
-    let t = Math.imul(s ^ (s >>> 15), 1 | s)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-  return arr
-}
-
-/** Take a varied sample: keep the strongest `poolSize` candidates (so a
- *  "gem" stays a gem), then shuffle that pool and pick `count`. */
-function sample<T>(ranked: T[], seed: number, count: number, poolSize: number): T[] {
-  const pool = ranked.slice(0, poolSize)
-  return seededShuffle(pool, seed).slice(0, count)
-}
-
 /* ------------------------------------------------------------------ */
 /*  Discovery                                                          */
 /* ------------------------------------------------------------------ */
@@ -69,12 +42,7 @@ export interface Discovery {
   blindArtists: Artist[]
 }
 
-/**
- * Discovery surfaces. `seed` mixes up which records are shown — pass a fresh
- * value (e.g. on mount or a "dig again" tap) to get a different selection
- * each time rather than the same top-by-plays list.
- */
-export function deriveDiscovery(data: MusicData, seed = 1): Discovery {
+export function deriveDiscovery(data: MusicData): Discovery {
   const { albums, artists, plays } = data
   const artistNames = artistNameMap(artists)
   const albumLast = lastPlayedMap(plays, 'al')
@@ -87,35 +55,30 @@ export function deriveDiscovery(data: MusicData, seed = 1): Discovery {
     lastPlayed: albumLast.get(a.id) ?? null,
   })
 
-  // Forgotten gems: played before, but not in the last 6 months. Draw a
-  // varied sample from the most-played eligible records so it changes each
-  // visit while still surfacing genuine favourites.
-  const forgottenAlbumsRanked = albums
+  // Forgotten gems: have been played, but not in the last 6 months.
+  const forgottenAlbums = albums
     .filter((a) => a.play_count > 0)
     .map(decorate)
     .filter((a) => a.lastPlayed === null || a.lastPlayed < cutoff)
     .sort((a, b) => b.play_count - a.play_count)
-  const forgottenAlbums = sample(forgottenAlbumsRanked, seed, 24, 120)
+    .slice(0, 24)
 
-  const forgottenArtistsRanked = artists
+  const forgottenArtists = artists
     .filter((a) => a.play_count > 0)
     .filter((a) => {
       const last = artistLast.get(a.id)
       return last === undefined || last < cutoff
     })
     .sort((a, b) => b.play_count - a.play_count)
-  const forgottenArtists = sample(forgottenArtistsRanked, seed ^ 0x9e3779b9, 24, 120)
+    .slice(0, 24)
 
-  // Blind spots: never played — fully shuffled, no ranking to favour.
-  const blindAlbums = seededShuffle(
-    albums.filter((a) => a.play_count === 0).map(decorate),
-    seed ^ 0x85ebca6b,
-  ).slice(0, 24)
+  // Blind spots: never played.
+  const blindAlbums = albums
+    .filter((a) => a.play_count === 0)
+    .map(decorate)
+    .slice(0, 24)
 
-  const blindArtists = seededShuffle(
-    artists.filter((a) => a.play_count === 0),
-    seed ^ 0xc2b2ae35,
-  ).slice(0, 24)
+  const blindArtists = artists.filter((a) => a.play_count === 0).slice(0, 24)
 
   return { forgottenAlbums, forgottenArtists, blindAlbums, blindArtists }
 }
