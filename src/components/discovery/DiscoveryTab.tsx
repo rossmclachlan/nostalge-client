@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { MusicData } from '@/lib/types'
 import { deriveDiscovery, type AlbumWithArtist } from '@/lib/derive'
 import { formatPlays, relativeAge } from '@/lib/format'
 import { Cover } from '../Cover'
 import { EmptyState, SectionHeader } from '../ui'
-
-const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
 
 /* A rotating set of "why not today?" prompts. */
 const PROMPTS = [
@@ -31,10 +29,7 @@ export function DiscoveryTab({
   onOpenAlbum: (id: string) => void
   onOpenArtist: (id: string) => void
 }) {
-  // A fresh seed per mount means a different selection each time you land on
-  // the tab; "dig again" re-rolls it without leaving.
-  const [seed, setSeed] = useState(newSeed)
-  const d = useMemo(() => deriveDiscovery(data, seed), [data, seed])
+  const d = useMemo(() => deriveDiscovery(data), [data])
 
   const nothing =
     d.forgottenAlbums.length === 0 &&
@@ -53,12 +48,6 @@ export function DiscoveryTab({
 
   return (
     <div className="space-y-10">
-      <div className="flex justify-end">
-        <button onClick={() => setSeed(newSeed())} className="btn-press px-3 py-1.5 text-xs">
-          ↻ Dig again
-        </button>
-      </div>
-
       {/* Forgotten Gems */}
       {(d.forgottenAlbums.length > 0 || d.forgottenArtists.length > 0) && (
         <section>
