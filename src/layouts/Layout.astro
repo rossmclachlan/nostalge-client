@@ -52,9 +52,32 @@ const swScope = `${base}/`
       // browser without SW support (or a blocked registration) never breaks
       // the app — it just won't be installable/offline-cached.
       if ('serviceWorker' in navigator) {
+        let refreshing = false
+        // Whether the page is already controlled by a SW. On a brand-new
+        // install there's no controller yet, so we skip the reload that the
+        // initial clientsClaim would otherwise trigger on a first visit.
+        const hadController = !!navigator.serviceWorker.controller
+
+        // registerType:'autoUpdate' makes a new SW skipWaiting + clientsClaim,
+        // which fires `controllerchange` once the updated version takes over.
+        // Reload once so the page actually runs the new build (no manual
+        // hard-refresh needed after a deploy).
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing || !hadController) return
+          refreshing = true
+          window.location.reload()
+        })
+
         window.addEventListener('load', () => {
           navigator.serviceWorker
             .register(swPath, { scope: swScope })
+            .then((reg) => {
+              // Check for a newer SW whenever the app is brought back to the
+              // foreground, so reopening it picks up the latest deploy.
+              document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') reg.update()
+              })
+            })
             .catch(() => {})
         })
       }
