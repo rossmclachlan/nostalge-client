@@ -46,6 +46,11 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Take control of open pages as soon as a new SW activates, so the
+        // page's `controllerchange` reload handler fires and the app updates
+        // itself without needing every instance closed (or a reinstall).
+        skipWaiting: true,
+        clientsClaim: true,
         // Precache the app shell so it launches offline.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,webmanifest}'],
         // Keep album / artist art around once seen, even off-network.
