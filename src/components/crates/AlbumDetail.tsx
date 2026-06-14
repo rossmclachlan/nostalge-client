@@ -5,6 +5,7 @@ import { fetchTracksForAlbum } from '@/lib/pb'
 import { formatPlays, plainText, relativeAge } from '@/lib/format'
 import { Cover } from '../Cover'
 import { Chip, PlayBadge } from '../ui'
+import { CopyButton } from '../CopyButton'
 import { DetailHeader } from '../DetailHeader'
 
 function formatDuration(seconds: number): string {
@@ -81,6 +82,15 @@ export function AlbumDetail({
               {artist.name}
             </button>
           )}
+
+          {/* Copy for pasting into a streaming app's search */}
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <CopyButton
+              text={artist ? `${artist.name} - ${album.title}` : album.title}
+              label="Copy artist + album"
+            />
+            <CopyButton text={album.title} label="Copy album" />
+          </div>
         </div>
 
         {/* Two big facts */}

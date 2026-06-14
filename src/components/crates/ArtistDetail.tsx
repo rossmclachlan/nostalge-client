@@ -4,6 +4,7 @@ import { albumsForArtist } from '@/lib/derive'
 import { formatPlays, plainText, relativeAge } from '@/lib/format'
 import { Cover } from '../Cover'
 import { Chip, PlayBadge } from '../ui'
+import { CopyButton } from '../CopyButton'
 import { DetailHeader } from '../DetailHeader'
 
 export function ArtistDetail({
@@ -44,11 +45,10 @@ export function ArtistDetail({
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="stamp-title text-[2.4rem] break-words">{artist.name}</h1>
-            {artist.play_count > 0 && (
-              <div className="mt-2">
-                <PlayBadge count={artist.play_count} />
-              </div>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {artist.play_count > 0 && <PlayBadge count={artist.play_count} />}
+              <CopyButton text={artist.name} label="Copy name" />
+            </div>
           </div>
         </div>
 
