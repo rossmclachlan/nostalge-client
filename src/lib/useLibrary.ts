@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { hasData, loadCache, saveCache } from './cache'
 import { fetchAlbums, fetchArtists, fetchPlays, fetchTags, healthCheck } from './pb'
 import type { ConnectionState, MusicData } from './types'
@@ -13,9 +13,12 @@ interface LibraryState {
 /**
  * The offline-graceful data layer, as a hook.
  *
- *  1. Immediately surface whatever is cached (instant, works offline).
- *  2. Probe PocketBase. If it answers, fetch fresh data and replace the
- *     cache. If it doesn't, do nothing — we keep showing the cache.
+ *  - On load it surfaces whatever is cached (instant, works offline). It does
+ *    NOT sync automatically — syncing only happens when `refresh()` is called
+ *    (the masthead refresh button), so reloading while away from the home
+ *    network doesn't kick off a doomed health-check every time.
+ *  - `refresh()` probes PocketBase; if it answers, fresh data replaces the
+ *    cache, otherwise the cache stays put.
  *
  * There is no error state by design: worst case we show an empty/welcome
  * screen.
@@ -60,10 +63,6 @@ export function useLibrary(): LibraryState {
       setSyncing(false)
     }
   }, [])
-
-  useEffect(() => {
-    void sync()
-  }, [sync])
 
   const refresh = useCallback(() => {
     void sync()
