@@ -46,9 +46,9 @@ export function StatsTab({
       {stats.topArtists.length > 0 && (
         <section>
           <SectionHeader kicker="all time" title="Top Artists" />
-          <ol>
+          <ol className="lg:columns-2 lg:gap-x-10">
             {stats.topArtists.map((a, i) => (
-              <li key={a.id}>
+              <li key={a.id} className="break-inside-avoid">
                 <button
                   onClick={() => onOpenArtist(a.id)}
                   className="flex w-full items-baseline gap-3 border-b-[1.5px] border-ink/30 py-2 text-left active:bg-paper-3"
@@ -73,9 +73,9 @@ export function StatsTab({
       {stats.topAlbums.length > 0 && (
         <section>
           <SectionHeader kicker="all time" title="Top Albums" />
-          <ol>
+          <ol className="lg:columns-2 lg:gap-x-10">
             {stats.topAlbums.map((a, i) => (
-              <li key={a.id}>
+              <li key={a.id} className="break-inside-avoid">
                 <button
                   onClick={() => onOpenAlbum(a.id)}
                   className="flex w-full items-baseline gap-3 border-b-[1.5px] border-ink/30 py-2 text-left active:bg-paper-3"
