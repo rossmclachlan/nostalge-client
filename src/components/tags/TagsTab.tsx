@@ -27,7 +27,7 @@ export function TagsTab({
   return (
     <div>
       <p className="label text-ink-3 mb-3">{tags.length} dividers</p>
-      <ul className="space-y-2.5">
+      <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {tags.map((tag, i) => (
           <li key={tag.id}>
             <button
