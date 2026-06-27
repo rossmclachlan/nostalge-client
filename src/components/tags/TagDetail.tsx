@@ -55,7 +55,7 @@ export function TagDetail({
         {albums.length > 0 && (
           <>
             <h2 className="stamp-title mt-8 mb-3 text-[1.6rem]">Albums</h2>
-            <div className="grid grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
               {albums.map((album, i) => (
                 <button
                   key={album.id}

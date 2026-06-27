@@ -67,7 +67,7 @@ export function DiscoveryTab({
             Records you've worn out before, quietly gathering dust.
           </p>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
             {d.forgottenAlbums.map((album, i) => (
               <ForgottenAlbumCard
                 key={album.id}
@@ -105,7 +105,7 @@ export function DiscoveryTab({
             You filed these away and never played them. No time like today.
           </p>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
             {d.blindAlbums.map((album, i) => (
               <button
                 key={album.id}
