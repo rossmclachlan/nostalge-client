@@ -86,7 +86,7 @@ export default function App() {
             onRefresh={refresh}
           />
           <main className="pb-safe px-4 pt-4">
-            {tab === 'crates' && <CratesTab data={data} onOpenArtist={openArtist} />}
+            {tab === 'crates' && <CratesTab data={data} onOpenAlbum={openAlbum} />}
             {tab === 'discovery' && (
               <DiscoveryTab
                 data={data}

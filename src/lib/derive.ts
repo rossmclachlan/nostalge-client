@@ -154,6 +154,17 @@ export function sortedTags(data: MusicData): Tag[] {
 /*  Crates                                                             */
 /* ------------------------------------------------------------------ */
 
+/** Every album decorated with artist name + last-played, for the Crates grid. */
+export function allAlbums(data: MusicData): AlbumWithArtist[] {
+  const names = artistNameMap(data.artists)
+  const albumLast = lastPlayedMap(data.plays, 'al')
+  return data.albums.map((a) => ({
+    ...a,
+    artistName: names.get(a.artist) ?? 'Unknown',
+    lastPlayed: albumLast.get(a.id) ?? null,
+  }))
+}
+
 export function albumsForArtist(data: MusicData, artistId: string): AlbumWithArtist[] {
   const albumLast = lastPlayedMap(data.plays, 'al')
   const name = data.artists.find((a) => a.id === artistId)?.name ?? 'Unknown'
