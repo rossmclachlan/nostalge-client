@@ -53,7 +53,7 @@ export function CratesTab({
       {albums.length === 0 ? (
         <p className="label text-ink-3 mt-8 text-center">No albums match “{query}”</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {albums.map((album, i) => (
             <AlbumCard
               key={album.id}

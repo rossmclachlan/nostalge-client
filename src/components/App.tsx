@@ -46,9 +46,10 @@ export default function App() {
   const detail = stack[stack.length - 1]
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md">
+    <div className="mx-auto min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
       {detail ? (
-        <div className="pb-safe">
+        // Detail pages stay a readable column even on wide screens.
+        <div className="pb-safe mx-auto max-w-2xl">
           {detail.kind === 'artist' && (
             <ArtistDetail
               data={data}
@@ -85,7 +86,7 @@ export default function App() {
             syncing={syncing}
             onRefresh={refresh}
           />
-          <main className="pb-safe px-4 pt-4">
+          <main className="pb-safe px-4 pt-4 sm:px-6">
             {tab === 'crates' && <CratesTab data={data} onOpenAlbum={openAlbum} />}
             {tab === 'discovery' && (
               <DiscoveryTab
@@ -120,7 +121,7 @@ function Masthead({
   onRefresh: () => void
 }) {
   return (
-    <header className="border-b-[1.5px] border-ink bg-paper-2 px-4 pb-3 pt-4">
+    <header className="border-b-[1.5px] border-ink bg-paper-2 px-4 pb-3 pt-4 sm:px-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="label text-ink-3 leading-none">Nostalge</p>

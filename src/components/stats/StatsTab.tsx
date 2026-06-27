@@ -27,7 +27,7 @@ export function StatsTab({
   return (
     <div className="space-y-10">
       {/* Headline figures */}
-      <section className="grid grid-cols-2 gap-3">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <BigStat value={formatPlays(stats.totalPlays)} label="total plays" tone="red" />
         <BigStat value={String(stats.totalArtists)} label="artists" tone="olive" />
         <BigStat value={String(stats.totalAlbums)} label="albums" tone="ink" />
