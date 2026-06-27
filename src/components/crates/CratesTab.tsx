@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import type { Artist, MusicData } from '@/lib/types'
+import type { MusicData } from '@/lib/types'
+import { allAlbums, type AlbumWithArtist } from '@/lib/derive'
 import { formatPlays } from '@/lib/format'
 import { Cover } from '../Cover'
 import { EmptyState } from '../ui'
@@ -7,32 +8,36 @@ import { SearchIcon } from '../icons'
 
 export function CratesTab({
   data,
-  onOpenArtist,
+  onOpenAlbum,
 }: {
   data: MusicData
-  onOpenArtist: (id: string) => void
+  onOpenAlbum: (id: string) => void
 }) {
   const [query, setQuery] = useState('')
 
-  const artists = useMemo(() => {
-    const sorted = [...data.artists].sort((a, b) => b.play_count - a.play_count)
+  const albums = useMemo(() => {
+    const sorted = allAlbums(data).sort((a, b) => b.play_count - a.play_count)
     const q = query.trim().toLowerCase()
     if (!q) return sorted
-    return sorted.filter((a) => a.name.toLowerCase().includes(q))
-  }, [data.artists, query])
+    return sorted.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.artistName.toLowerCase().includes(q),
+    )
+  }, [data, query])
 
-  if (data.artists.length === 0) {
+  if (data.albums.length === 0) {
     return (
       <EmptyState
         title="Empty crates"
-        body="Nothing's been filed away yet. Once your library syncs, your artists land here — even with the shop's wifi down."
+        body="Nothing's been filed away yet. Once your library syncs, your albums land here — even with the shop's wifi down."
       />
     )
   }
 
   return (
     <div>
-      <p className="label text-ink-3 mb-2">{data.artists.length} artists on the shelf</p>
+      <p className="label text-ink-3 mb-2">{data.albums.length} sleeves in the crate</p>
 
       {/* Search */}
       <div className="flyer mb-5 flex items-center gap-2 px-3 py-2">
@@ -45,18 +50,16 @@ export function CratesTab({
         />
       </div>
 
-      {artists.length === 0 ? (
-        <p className="label text-ink-3 mt-8 text-center">
-          No artists match “{query}”
-        </p>
+      {albums.length === 0 ? (
+        <p className="label text-ink-3 mt-8 text-center">No albums match “{query}”</p>
       ) : (
         <div className="grid grid-cols-2 gap-3.5">
-          {artists.map((artist, i) => (
-            <ArtistCard
-              key={artist.id}
-              artist={artist}
+          {albums.map((album, i) => (
+            <AlbumCard
+              key={album.id}
+              album={album}
               tilt={i % 2 === 0 ? 'tilt-l' : 'tilt-r'}
-              onClick={() => onOpenArtist(artist.id)}
+              onClick={() => onOpenAlbum(album.id)}
             />
           ))}
         </div>
@@ -65,30 +68,29 @@ export function CratesTab({
   )
 }
 
-function ArtistCard({
-  artist,
+function AlbumCard({
+  album,
   tilt,
   onClick,
 }: {
-  artist: Artist
+  album: AlbumWithArtist
   tilt: string
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className="flyer group block p-2 text-left transition-transform active:translate-y-[2px] active:shadow-none"
+      className="flyer block p-2 text-left transition-transform active:translate-y-[2px] active:shadow-none"
     >
       <div className={tilt}>
-        <Cover name={artist.name} src={artist.image_url} />
+        <Cover name={album.title} src={album.image_url} />
       </div>
-      <div className="mt-2 flex items-end justify-between gap-1">
-        <h3 className="font-display text-xl leading-none text-ink line-clamp-2 uppercase">
-          {artist.name}
-        </h3>
-      </div>
-      {artist.play_count > 0 && (
-        <p className="label text-ink-3 mt-1">{formatPlays(artist.play_count)} plays</p>
+      <h3 className="font-display mt-2 text-lg leading-none text-ink uppercase line-clamp-2">
+        {album.title}
+      </h3>
+      <p className="label text-ink-3 mt-1 truncate">{album.artistName}</p>
+      {album.play_count > 0 && (
+        <p className="label text-ink-3 mt-0.5">{formatPlays(album.play_count)} plays</p>
       )}
     </button>
   )
