@@ -57,8 +57,8 @@ export function RecentTab() {
               : connection === 'live'
                 ? 'pulled fresh from the server'
                 : connection === 'cached'
-                  ? 'showing last-known (server unreachable)'
-                  : 'no scrobbles yet'}
+                  ? 'showing last saved · tap ↻ to check the NAS'
+                  : 'tap ↻ to check the NAS'}
           </p>
         </div>
       </div>

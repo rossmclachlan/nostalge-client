@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { fetchRecentPlays, healthCheck } from './pb'
 import type { ConnectionState, RecentPlay } from './types'
 
@@ -63,9 +63,7 @@ export function useRecentPlays(): RecentState {
     }
   }, [])
 
-  useEffect(() => {
-    void sync()
-  }, [sync])
-
+  // No auto-fetch: the user pulls fresh data with the refresh button. This
+  // keeps reloads/visits from firing a health-check when away from the NAS.
   return { plays, connection, syncing, checkedAt, refresh: () => void sync() }
 }
