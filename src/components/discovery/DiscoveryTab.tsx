@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { MusicData } from '@/lib/types'
 import { deriveDiscovery, type AlbumWithArtist } from '@/lib/derive'
 import { formatPlays, relativeAge } from '@/lib/format'
 import { Cover } from '../Cover'
 import { EmptyState, SectionHeader } from '../ui'
-
-const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
 
 /* A rotating set of "why not today?" prompts. */
 const PROMPTS = [
@@ -24,16 +22,18 @@ function promptFor(seed: string): string {
 
 export function DiscoveryTab({
   data,
+  seed,
+  onReroll,
   onOpenAlbum,
   onOpenArtist,
 }: {
   data: MusicData
+  /** Selection seed, owned by App so it persists across detail navigation. */
+  seed: number
+  onReroll: () => void
   onOpenAlbum: (id: string) => void
   onOpenArtist: (id: string) => void
 }) {
-  // A fresh seed per mount means a different selection each time you land on
-  // the tab; "dig again" re-rolls it without leaving.
-  const [seed, setSeed] = useState(newSeed)
   const d = useMemo(() => deriveDiscovery(data, seed), [data, seed])
 
   const nothing =
@@ -54,7 +54,7 @@ export function DiscoveryTab({
   return (
     <div className="space-y-10">
       <div className="flex justify-end">
-        <button onClick={() => setSeed(newSeed())} className="btn-press px-3 py-1.5 text-xs">
+        <button onClick={onReroll} className="btn-press px-3 py-1.5 text-xs">
           ↻ Dig again
         </button>
       </div>

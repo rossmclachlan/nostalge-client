@@ -26,10 +26,16 @@ const TAB_TITLES: Record<Tab, string> = {
   recent: 'Recent',
 }
 
+const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
+
 export default function App() {
   const { data, connection, syncing, refresh } = useLibrary()
   const [tab, setTab] = useState<Tab>('discovery')
   const [stack, setStack] = useState<Detail[]>([])
+  // Kept here (App stays mounted) so the Discovery selection survives drilling
+  // into a detail and pressing back. It only re-rolls when you deliberately
+  // switch to the Discovery tab, or tap "Dig again".
+  const [discoverySeed, setDiscoverySeed] = useState(newSeed)
 
   const push = useCallback((d: Detail) => setStack((s) => [...s, d]), [])
   const back = useCallback(() => setStack((s) => s.slice(0, -1)), [])
@@ -40,6 +46,7 @@ export default function App() {
   const changeTab = useCallback((next: Tab) => {
     setStack([])
     setTab(next)
+    if (next === 'discovery') setDiscoverySeed(newSeed())
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -91,6 +98,8 @@ export default function App() {
             {tab === 'discovery' && (
               <DiscoveryTab
                 data={data}
+                seed={discoverySeed}
+                onReroll={() => setDiscoverySeed(newSeed())}
                 onOpenAlbum={openAlbum}
                 onOpenArtist={openArtist}
               />
