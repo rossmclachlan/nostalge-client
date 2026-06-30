@@ -33,7 +33,9 @@ export function BottomNav({
                 aria-current={on ? 'page' : undefined}
                 className={cn(
                   'flex w-full flex-col items-center gap-1 py-2.5 transition-colors',
-                  on ? 'bg-ink text-riso-yellow' : 'text-ink-2 active:bg-paper-3',
+                  on
+                    ? 'bg-[var(--nav-active-bg)] text-riso-yellow'
+                    : 'text-ink-2 active:bg-paper-3',
                 )}
               >
                 <Icon className="h-[22px] w-[22px]" strokeWidth={on ? 2.4 : 1.8} />

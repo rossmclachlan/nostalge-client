@@ -31,6 +31,11 @@
   /* Colour of the hard offset drop-shadow on cards/buttons. Overridden in
      dark mode so the pinned-to-corkboard effect still reads. */
   --shadow-ink: rgba(27, 23, 18, 0.85);
+
+  /* Background of the selected bottom-nav tab. A strong inked block in light
+     mode; a subtle warm elevation in dark mode (see .dark) so it doesn't
+     glare. */
+  --nav-active-bg: var(--color-ink);
 }
 
 /* ------------------------------------------------------------------ */
@@ -53,6 +58,9 @@
 
   /* A near-black offset reads as depth against the (lighter) dark cards */
   --shadow-ink: rgba(0, 0, 0, 0.7);
+
+  /* Subtle warm elevation instead of a bright cream block */
+  --nav-active-bg: #3f3526;
 }
 
 /* ------------------------------------------------------------------ */
