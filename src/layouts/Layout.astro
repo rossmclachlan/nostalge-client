@@ -23,7 +23,24 @@ const swScope = `${base}/`
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0"
     />
-    <meta name="theme-color" content="#1b1712" />
+    <meta name="theme-color" content="#f1e7d0" />
+
+    <!-- Apply the saved/system theme before paint to avoid a flash. -->
+    <script is:inline>
+      ;(function () {
+        try {
+          var t = localStorage.getItem('nostalge:theme')
+          if (t !== 'dark' && t !== 'light') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+          }
+          document.documentElement.classList.toggle('dark', t === 'dark')
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', t === 'dark' ? '#1e1913' : '#f1e7d0')
+        } catch (e) {}
+      })()
+    </script>
     <meta
       name="description"
       content="A record crate for rediscovering the music you already own."

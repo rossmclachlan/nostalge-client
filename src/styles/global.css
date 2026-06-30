@@ -27,6 +27,32 @@
 
   /* Hard, photocopied edges — almost no rounding */
   --radius-sticker: 2px;
+
+  /* Colour of the hard offset drop-shadow on cards/buttons. Overridden in
+     dark mode so the pinned-to-corkboard effect still reads. */
+  --shadow-ink: rgba(27, 23, 18, 0.85);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Dark mode — swap paper/ink, keep the riso accents                  */
+/* ------------------------------------------------------------------ */
+.dark {
+  --color-paper: #1e1913;
+  --color-paper-2: #2a241b;
+  --color-paper-3: #352e22;
+  --color-kraft: #4f4230;
+  --color-ink: #ece3cf;
+  --color-ink-2: #c9bfa6;
+  --color-ink-3: #8c8369;
+
+  /* Slightly brighter accents so they pop on the dark ground */
+  --color-riso-red: #e0573f;
+  --color-riso-olive: #8a9a45;
+  --color-riso-yellow: #edb22a;
+  --color-riso-blue: #4f8aa0;
+
+  /* A near-black offset reads as depth against the (lighter) dark cards */
+  --shadow-ink: rgba(0, 0, 0, 0.7);
 }
 
 /* ------------------------------------------------------------------ */
@@ -35,7 +61,7 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
-    background-color: var(--color-ink);
+    background-color: var(--color-paper);
   }
 
   body {
@@ -104,7 +130,7 @@
     background-color: var(--color-paper-2);
     border: 1.5px solid var(--color-ink);
     border-radius: var(--radius-sticker);
-    box-shadow: 3px 4px 0 0 rgba(27, 23, 18, 0.85);
+    box-shadow: 3px 4px 0 0 var(--shadow-ink);
   }
 
   /* Toner / age overlay applied with mix-blend so colours sit under it */
@@ -126,7 +152,7 @@
     border: 1.5px solid var(--color-ink);
     padding: 0.05rem 0.45rem;
     transform: rotate(-3deg);
-    box-shadow: 1px 1px 0 0 rgba(27, 23, 18, 0.7);
+    box-shadow: 1px 1px 0 0 var(--shadow-ink);
   }
 
   /* A button that feels pressed: it sits on a hard shadow, and the    */
@@ -140,7 +166,7 @@
     color: var(--color-ink);
     border: 1.5px solid var(--color-ink);
     border-radius: var(--radius-sticker);
-    box-shadow: 2px 2px 0 0 var(--color-ink);
+    box-shadow: 2px 2px 0 0 var(--shadow-ink);
     transition:
       transform 90ms ease,
       box-shadow 90ms ease,
@@ -148,7 +174,7 @@
   }
   .btn-press:active {
     transform: translate(2px, 2px);
-    box-shadow: 0 0 0 0 var(--color-ink);
+    box-shadow: 0 0 0 0 var(--shadow-ink);
   }
 
   /* Cardboard crate divider — the handwritten genre cards */
@@ -158,14 +184,14 @@
     border: 1.5px solid var(--color-ink);
     border-left-width: 8px;
     border-radius: var(--radius-sticker);
-    box-shadow: 2px 3px 0 0 rgba(27, 23, 18, 0.8);
+    box-shadow: 2px 3px 0 0 var(--shadow-ink);
     transition:
       transform 90ms ease,
       box-shadow 90ms ease;
   }
   .divider-card:active {
     transform: translate(2px, 2px);
-    box-shadow: 0 1px 0 0 rgba(27, 23, 18, 0.8);
+    box-shadow: 0 1px 0 0 var(--shadow-ink);
   }
 }
 

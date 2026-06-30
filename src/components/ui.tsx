@@ -47,7 +47,7 @@ export function Chip({
       className={cn(
         'label inline-flex items-center border-[1.5px] border-ink px-2 py-[3px] leading-none',
         tones[tone],
-        onClick && 'btn-press !shadow-[1.5px_1.5px_0_0_var(--color-ink)]',
+        onClick && 'btn-press !shadow-[1.5px_1.5px_0_0_var(--shadow-ink)]',
         className,
       )}
     >

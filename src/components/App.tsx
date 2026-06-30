@@ -3,6 +3,7 @@ import { useLibrary } from '@/lib/useLibrary'
 import { cn } from '@/lib/cn'
 import { BottomNav, type Tab } from './BottomNav'
 import { InstallButton } from './InstallButton'
+import { ThemeToggle } from './ThemeToggle'
 import { RefreshIcon } from './icons'
 import { CratesTab } from './crates/CratesTab'
 import { ArtistDetail } from './crates/ArtistDetail'
@@ -140,6 +141,7 @@ function Masthead({
           <ConnectionFlag connection={connection} syncing={syncing} />
           <div className="flex items-center gap-2">
             <InstallButton />
+            <ThemeToggle />
             <button
               onClick={onRefresh}
               disabled={syncing}
