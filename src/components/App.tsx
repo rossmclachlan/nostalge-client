@@ -102,7 +102,6 @@ export default function App() {
                 seed={discoverySeed}
                 onReroll={() => setDiscoverySeed(newSeed())}
                 onOpenAlbum={openAlbum}
-                onOpenArtist={openArtist}
               />
             )}
             {tab === 'tags' && <TagsTab data={data} onOpenTag={openTag} />}
