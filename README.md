@@ -12,6 +12,9 @@ degrades gracefully — it never shows a broken or error state.
 Built with **Astro** (static output) + **React islands**, **TypeScript**, and
 **Tailwind CSS**. The design system is hand-rolled — no UI component libraries.
 
+> For a technical deep-dive (data flow, modules, discovery engine, theming,
+> PWA, deploy), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
 ## The four crates
 
 - **Crates** — browse every artist as a card (album art or a generated
