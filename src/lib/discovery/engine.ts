@@ -64,9 +64,27 @@ export interface EngineCtx {
   rand: () => number
 }
 
+/**
+ * Albums deliberately kept out of Discovery, matched case-insensitively on
+ * artist + title. Screws is the kids' bedtime record — its play count is
+ * huge and it needs no reminding. Worth unearthing years from now: just
+ * delete its entry.
+ */
+const DISCOVERY_EXCLUSIONS: { artist: string; title: string }[] = [
+  { artist: 'nils frahm', title: 'screws' },
+]
+
 export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx {
   const albumById = new Map(data.albums.map((a) => [a.id, a]))
   const artistNameById = new Map(data.artists.map((a) => [a.id, a.name]))
+
+  const excluded = (a: Album) =>
+    DISCOVERY_EXCLUSIONS.some(
+      (x) =>
+        a.title.toLowerCase() === x.title &&
+        (artistNameById.get(a.artist) ?? '').toLowerCase() === x.artist,
+    )
+  const albums = data.albums.filter((a) => !excluded(a))
 
   const albumPlays = new Map<string, number[]>()
   for (const p of data.plays) {
@@ -88,7 +106,7 @@ export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx 
 
   return {
     now,
-    albums: data.albums,
+    albums,
     albumById,
     artistNameById,
     albumPlays,
