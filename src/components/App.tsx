@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useLibrary } from '@/lib/useLibrary'
 import { cn } from '@/lib/cn'
 import { BottomNav, type Tab } from './BottomNav'
@@ -38,13 +38,35 @@ export default function App() {
   // switch to the Discovery tab, or tap "Dig again".
   const [discoverySeed, setDiscoverySeed] = useState(newSeed)
 
-  const push = useCallback((d: Detail) => setStack((s) => [...s, d]), [])
+  // Scroll offsets saved per stack depth, so Back returns you to where you
+  // were in the list you drilled in from.
+  const savedScroll = useRef<number[]>([])
+
+  const push = useCallback((d: Detail) => {
+    savedScroll.current.push(window.scrollY)
+    setStack((s) => [...s, d])
+  }, [])
   const back = useCallback(() => setStack((s) => s.slice(0, -1)), [])
+
+  // After the view swaps: a freshly opened detail starts at the top; going
+  // back restores the saved offset. Runs before paint, so there's no flicker.
+  const depth = stack.length
+  const prevDepth = useRef(0)
+  useLayoutEffect(() => {
+    if (depth > prevDepth.current) {
+      window.scrollTo({ top: 0 })
+    } else if (depth < prevDepth.current) {
+      const restored = savedScroll.current.splice(depth)[0] ?? 0
+      window.scrollTo({ top: restored })
+    }
+    prevDepth.current = depth
+  }, [depth])
   const openArtist = useCallback((id: string) => push({ kind: 'artist', id }), [push])
   const openAlbum = useCallback((id: string) => push({ kind: 'album', id }), [push])
   const openTag = useCallback((id: string) => push({ kind: 'tag', id }), [push])
 
   const changeTab = useCallback((next: Tab) => {
+    savedScroll.current = []
     setStack([])
     setTab(next)
     if (next === 'discovery') setDiscoverySeed(newSeed())
