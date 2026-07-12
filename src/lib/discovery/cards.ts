@@ -435,8 +435,15 @@ const sleeperLoved: CardGenerator = () => null
 
 const playsPerYear: CardGenerator = (ctx) => {
   // Ownership date isn't stored, so we proxy it with the earliest cached play.
+  // BUT the play cache is capped at the most recent scrobbles, so for an older
+  // album its early history is truncated and the first cached play looks recent
+  // — which massively inflates an annualised rate (a long-owned album with 53
+  // total plays reading as "398 plays per year owned"). Only trust the proxy
+  // when the window holds essentially all of the album's plays, i.e. it really
+  // is new to the shelf; otherwise skip it.
   const best = bestAlbum(ctx, (a, plays) => {
     if (a.play_count < 20 || plays.length === 0) return 0
+    if (plays.length < a.play_count * 0.8) return 0 // history truncated → not new
     const owned = (ctx.now - plays[0]) / YEAR
     if (owned < 0.1 || owned > 2) return 0 // focus on recent fast burners
     return a.play_count / owned
