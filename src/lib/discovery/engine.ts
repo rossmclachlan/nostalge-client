@@ -1,4 +1,4 @@
-import type { Album, MusicData } from '../types'
+import type { Album, Artist, MusicData } from '../types'
 
 /* ------------------------------------------------------------------ */
 /*  Card model                                                         */
@@ -56,6 +56,7 @@ export interface EngineCtx {
   now: number
   albums: Album[]
   albumById: Map<string, Album>
+  artistById: Map<string, Artist>
   artistNameById: Map<string, string>
   /** albumId -> sorted (asc) epoch-ms timestamps of its cached plays */
   albumPlays: Map<string, number[]>
@@ -76,6 +77,7 @@ const DISCOVERY_EXCLUSIONS: { artist: string; title: string }[] = [
 
 export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx {
   const albumById = new Map(data.albums.map((a) => [a.id, a]))
+  const artistById = new Map(data.artists.map((a) => [a.id, a]))
   const artistNameById = new Map(data.artists.map((a) => [a.id, a.name]))
 
   const excluded = (a: Album) =>
@@ -108,6 +110,7 @@ export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx 
     now,
     albums,
     albumById,
+    artistById,
     artistNameById,
     albumPlays,
     toCardAlbum,

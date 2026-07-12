@@ -1,4 +1,5 @@
-import type { Album } from '../types'
+import type { Album, Artist } from '../types'
+import { formatPlays, plainText } from '../format'
 import type { CardGenerator, DiscoveryCard, EngineCtx } from './engine'
 
 /* ------------------------------------------------------------------ */
@@ -690,6 +691,209 @@ const theCompletist: CardGenerator = (ctx) => {
 }
 
 /* ================================================================== */
+/*  UNTAPPED SIGNALS — similar artists, global listeners, rare tags,   */
+/*  sleeve notes, play-day streaks, seasonality                        */
+/* ================================================================== */
+
+/** Albums grouped by artist id. */
+function albumsByArtist(ctx: EngineCtx): Map<string, Album[]> {
+  const map = new Map<string, Album[]>()
+  for (const a of ctx.albums) {
+    const arr = map.get(a.artist)
+    if (arr) arr.push(a)
+    else map.set(a.artist, [a])
+  }
+  return map
+}
+
+/** Filed near a well-played artist: albums you own by their similar artists. */
+const neighbours: CardGenerator = (ctx) => {
+  // similar_artists entries could be ids, mbids or names — resolve any of them
+  // to a library artist.
+  const byMbid = new Map<string, Artist>()
+  const byName = new Map<string, Artist>()
+  for (const ar of ctx.artistById.values()) {
+    if (ar.mbid) byMbid.set(ar.mbid, ar)
+    if (ar.name) byName.set(ar.name.toLowerCase(), ar)
+  }
+  const resolve = (key: string): Artist | undefined => {
+    const k = String(key).trim()
+    return ctx.artistById.get(k) ?? byMbid.get(k) ?? byName.get(k.toLowerCase())
+  }
+
+  const albumsFor = albumsByArtist(ctx)
+
+  const viable = [...ctx.artistById.values()]
+    .filter(
+      (a) =>
+        a.play_count > 0 &&
+        Array.isArray(a.similar_artists) &&
+        a.similar_artists.length > 0,
+    )
+    .sort((a, b) => b.play_count - a.play_count)
+    .slice(0, 25)
+    .map((anchor) => {
+      const seen = new Set<string>([anchor.id])
+      const albums: Album[] = []
+      for (const sim of anchor.similar_artists) {
+        const neigh = resolve(sim)
+        if (!neigh || seen.has(neigh.id)) continue
+        seen.add(neigh.id)
+        const their = albumsFor.get(neigh.id)
+        if (their?.length) albums.push(...their)
+      }
+      return { anchor, albums }
+    })
+    .filter((x) => x.albums.length >= 2)
+
+  if (viable.length === 0) return null
+  const { anchor, albums } = pickDistinct(viable, 1, ctx.rand)[0]
+  return {
+    id: `neighbours-${anchor.id}`,
+    category: 'calculated',
+    headline: 'Neighbours',
+    subheadline: `Filed near ${anchor.name} — kindred artists already in your crate.`,
+    albums: [...albums].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
+    cta: 'Follow the thread',
+    narrativeScore: 0.6,
+  }
+}
+
+/** Your obscure favourite: high personal plays, few global listeners. */
+const nobodyElseListens: CardGenerator = (ctx) => {
+  let best: { album: Album; artist: Artist; ratio: number } | null = null
+  for (const a of ctx.albums) {
+    if (a.play_count < 15) continue
+    const artist = ctx.artistById.get(a.artist)
+    if (!artist || !artist.listener_count || artist.listener_count <= 0) continue
+    if (artist.listener_count > 100_000) continue // genuinely under-the-radar only
+    const ratio = a.play_count / artist.listener_count
+    if (!best || ratio > best.ratio) best = { album: a, artist, ratio }
+  }
+  if (!best) return null
+  return {
+    id: 'nobody-else-listens',
+    category: 'calculated',
+    headline: 'Nobody Else Listens',
+    subheadline: `You've worn this out. The rest of the world never found it.`,
+    metric: {
+      value: formatPlays(best.artist.listener_count),
+      label: 'listeners worldwide',
+    },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Put it on',
+    narrativeScore: 0.7,
+  }
+}
+
+// Obvious non-genre Last.fm tags to keep out of "Rare Groove".
+const NON_GENRE = new Set([
+  'seen live', 'favourite', 'favourites', 'favorite', 'favorites', 'love',
+  'albums i own', 'vinyl', 'spotify', 'beautiful', 'awesome', 'best',
+  'check out', 'good', 'great', 'amazing', 'my music', 'owned',
+])
+
+/** A genre almost nothing else in the crate carries. */
+const rareGroove: CardGenerator = (ctx) => {
+  const rare = [...albumsByTag(ctx).entries()].filter(
+    ([tag, list]) =>
+      !YEAR_TAG.test(tag) &&
+      tag.length >= 3 &&
+      !NON_GENRE.has(tag) &&
+      list.length >= 1 &&
+      list.length <= 2,
+  )
+  if (rare.length === 0) return null
+  return pickDistinct(rare, 2, ctx.rand).map(([tag, list]) => ({
+    id: `rare-groove-${tag}`,
+    category: 'genre' as const,
+    headline: 'Rare Groove',
+    subheadline:
+      list.length === 1
+        ? `The only ${tag} record in the whole crate.`
+        : `One of just ${list.length} ${tag} records you own.`,
+    metric: { value: String(list.length), label: `tagged ${tag}` },
+    albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
+    cta: 'Put it on',
+    narrativeScore: 0.55,
+  }))
+}
+
+/** Leads with a line lifted from the album's write-up. */
+const sleeveNotes: CardGenerator = (ctx) => {
+  const withNotes = ctx.albums.filter((a) => (a.wiki_summary?.length ?? 0) > 160)
+  if (withNotes.length === 0) return null
+  const album = pickDistinct(withNotes, 1, ctx.rand)[0]
+  return {
+    id: 'sleeve-notes',
+    category: 'wildcard',
+    headline: 'Sleeve Notes',
+    subheadline: `“${plainText(album.wiki_summary, 180)}”`,
+    albums: [ctx.toCardAlbum(album)],
+    cta: 'Put it on',
+    narrativeScore: 0.5,
+  }
+}
+
+/** An album you reached for on consecutive days. */
+const dailyDriver: CardGenerator = (ctx) => {
+  const dayIdx = (ms: number) => {
+    const d = new Date(ms)
+    return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / DAY)
+  }
+  let best: { album: Album; streak: number } | null = null
+  for (const a of ctx.albums) {
+    const plays = ctx.albumPlays.get(a.id)
+    if (!plays || plays.length < 4) continue
+    const days = [...new Set(plays.map(dayIdx))].sort((x, y) => x - y)
+    let run = 1
+    let max = 1
+    for (let i = 1; i < days.length; i++) {
+      run = days[i] === days[i - 1] + 1 ? run + 1 : 1
+      if (run > max) max = run
+    }
+    if (max >= 4 && (!best || max > best.streak)) best = { album: a, streak: max }
+  }
+  if (!best) return null
+  return {
+    id: 'daily-driver',
+    category: 'temporal',
+    headline: 'Daily Driver',
+    subheadline: `There was a stretch where this went on every single day.`,
+    metric: { value: String(best.streak), label: 'days in a row' },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Put it on',
+    narrativeScore: 0.7,
+  }
+}
+
+/** An album whose plays cluster hard into one calendar month. */
+const seasonal: CardGenerator = (ctx) => {
+  let best: { album: Album; month: number; frac: number } | null = null
+  for (const a of ctx.albums) {
+    const plays = ctx.albumPlays.get(a.id)
+    if (!plays || plays.length < 8) continue
+    const months = new Array(12).fill(0)
+    for (const t of plays) months[new Date(t).getMonth()]++
+    let top = 0
+    for (let m = 1; m < 12; m++) if (months[m] > months[top]) top = m
+    const frac = months[top] / plays.length
+    if (frac >= 0.45 && (!best || frac > best.frac)) best = { album: a, month: top, frac }
+  }
+  if (!best) return null
+  return {
+    id: 'seasonal',
+    category: 'temporal',
+    headline: `A ${MONTHS[best.month]} Record`,
+    subheadline: `Something about this one only really lands in ${MONTHS[best.month]}.`,
+    metric: { value: `${pct(best.frac)}%`, label: `of plays in ${MONTHS[best.month]}` },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Put it on',
+    narrativeScore: 0.65,
+  }
+}
+
+/* ================================================================== */
 /*  Registry                                                          */
 /* ================================================================== */
 
@@ -734,6 +938,13 @@ export const GENERATORS: CardGenerator[] = [
   classOf,
   pressedIn,
   theUnderplayed,
+  // untapped signals
+  neighbours,
+  nobodyElseListens,
+  rareGroove,
+  sleeveNotes,
+  dailyDriver,
+  seasonal,
 ]
 
 export type { DiscoveryCard }
