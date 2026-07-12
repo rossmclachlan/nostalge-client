@@ -894,6 +894,161 @@ const seasonal: CardGenerator = (ctx) => {
 }
 
 /* ================================================================== */
+/*  MORE VARIETY — single-session binges + tag/collection angles       */
+/*  (chosen to work even when the play cache spans only a short window) */
+/* ================================================================== */
+
+const dayIndex = (ms: number) => {
+  const d = new Date(ms)
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / DAY)
+}
+
+/** Non-year, non-junk genre tags for an album, lowercased. */
+function genreTagsOf(a: Album): string[] {
+  if (!Array.isArray(a.tags)) return []
+  return a.tags
+    .map((t) => String(t).trim().toLowerCase())
+    .filter((t) => t.length >= 3 && !YEAR_TAG.test(t) && !NON_GENRE.has(t))
+}
+
+/** The most plays an album got in a single calendar day. */
+const inOneSitting: CardGenerator = (ctx) => {
+  let best: { album: Album; count: number } | null = null
+  for (const a of ctx.albums) {
+    const plays = ctx.albumPlays.get(a.id)
+    if (!plays || plays.length < 5) continue
+    const byDay = new Map<number, number>()
+    for (const t of plays) {
+      const d = dayIndex(t)
+      byDay.set(d, (byDay.get(d) ?? 0) + 1)
+    }
+    let cnt = 0
+    for (const c of byDay.values()) if (c > cnt) cnt = c
+    if (cnt >= 5 && (!best || cnt > best.count)) best = { album: a, count: cnt }
+  }
+  if (!best) return null
+  return {
+    id: 'in-one-sitting',
+    category: 'temporal',
+    headline: 'In One Sitting',
+    subheadline: `One day you just kept flipping it back to side A.`,
+    metric: { value: String(best.count), label: 'plays in a single day' },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Put it on',
+    narrativeScore: 0.7,
+  }
+}
+
+/** The most plays an album got across a single Sat–Sun weekend. */
+const lostWeekend: CardGenerator = (ctx) => {
+  const saturdayOf = (ms: number): number | null => {
+    const d = new Date(ms)
+    const day = d.getDay() // 0 Sun … 6 Sat
+    if (day !== 0 && day !== 6) return null
+    const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    return Math.floor((day === 6 ? midnight : midnight - DAY) / DAY)
+  }
+  let best: { album: Album; count: number } | null = null
+  for (const a of ctx.albums) {
+    const plays = ctx.albumPlays.get(a.id)
+    if (!plays || plays.length < 5) continue
+    const byWeekend = new Map<number, number>()
+    for (const t of plays) {
+      const s = saturdayOf(t)
+      if (s == null) continue
+      byWeekend.set(s, (byWeekend.get(s) ?? 0) + 1)
+    }
+    let cnt = 0
+    for (const c of byWeekend.values()) if (c > cnt) cnt = c
+    if (cnt >= 5 && (!best || cnt > best.count)) best = { album: a, count: cnt }
+  }
+  if (!best) return null
+  return {
+    id: 'lost-weekend',
+    category: 'temporal',
+    headline: 'Lost Weekend',
+    subheadline: `This soundtracked one whole Saturday and Sunday.`,
+    metric: { value: String(best.count), label: 'plays in one weekend' },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Put it on',
+    narrativeScore: 0.65,
+  }
+}
+
+/** Albums sharing the most genre tags with a well-played anchor. */
+const moreLikeThis: CardGenerator = (ctx) => {
+  const anchors = ctx.albums
+    .filter((a) => a.play_count > 0 && genreTagsOf(a).length >= 3)
+    .sort(byPlays)
+    .slice(0, 15)
+  if (anchors.length === 0) return null
+  const anchor = pickDistinct(anchors, 1, ctx.rand)[0]
+  const anchorTags = new Set(genreTagsOf(anchor))
+  const scored = ctx.albums
+    .filter((a) => a.id !== anchor.id)
+    .map((a) => ({ a, shared: genreTagsOf(a).filter((t) => anchorTags.has(t)).length }))
+    .filter((x) => x.shared >= 2)
+    .sort((x, y) => y.shared - x.shared || byPlays(x.a, y.a))
+  if (scored.length < 2) return null
+  return {
+    id: `more-like-${anchor.id}`,
+    category: 'calculated',
+    headline: 'More Like This',
+    subheadline: `Cut from the same cloth as ${anchor.title}.`,
+    albums: scored.slice(0, 6).map((x) => ctx.toCardAlbum(x.a)),
+    cta: 'Follow the thread',
+    narrativeScore: 0.6,
+  }
+}
+
+/** A genre with several records but hardly any plays — a neglected shelf. */
+const shelfYouForgot: CardGenerator = (ctx) => {
+  const eligible = [...albumsByTag(ctx).entries()]
+    .filter(
+      ([tag, list]) =>
+        !YEAR_TAG.test(tag) && !NON_GENRE.has(tag) && tag.length >= 3 && list.length >= 4,
+    )
+    .map(([tag, list]) => ({
+      tag,
+      list,
+      avg: list.reduce((s, a) => s + (a.play_count || 0), 0) / list.length,
+    }))
+    .filter((x) => x.avg <= 8)
+    .sort((a, b) => a.avg - b.avg)
+  if (eligible.length === 0) return null
+  const pick = pickDistinct(eligible, 1, ctx.rand)[0]
+  return {
+    id: `shelf-forgot-${pick.tag}`,
+    category: 'genre',
+    headline: 'A Shelf You Forgot',
+    subheadline: `Your ${pick.tag} records barely get pulled. Worth another look.`,
+    metric: { value: String(pick.list.length), label: `${pick.tag}, hardly played` },
+    albums: [...pick.list]
+      .sort((a, b) => (a.play_count || 0) - (b.play_count || 0))
+      .slice(0, 6)
+      .map(ctx.toCardAlbum),
+    cta: 'Dig in',
+    narrativeScore: 0.6,
+  }
+}
+
+/** Real artwork, hardly played — sell it on the sleeve alone. */
+const judgeTheCover: CardGenerator = (ctx) => {
+  const candidates = ctx.albums.filter((a) => a.image_url && a.play_count <= 5)
+  if (candidates.length < 6) return null
+  const pick = pickDistinct(candidates, 1, ctx.rand)[0]
+  return {
+    id: 'judge-the-cover',
+    category: 'wildcard',
+    headline: 'Judge the Cover',
+    subheadline: `You've barely played it — but look at that sleeve.`,
+    albums: [ctx.toCardAlbum(pick)],
+    cta: 'Put it on',
+    narrativeScore: 0.5,
+  }
+}
+
+/* ================================================================== */
 /*  Registry                                                          */
 /* ================================================================== */
 
@@ -945,6 +1100,12 @@ export const GENERATORS: CardGenerator[] = [
   sleeveNotes,
   dailyDriver,
   seasonal,
+  // more variety — binges + tag/collection angles
+  inOneSitting,
+  lostWeekend,
+  moreLikeThis,
+  shelfYouForgot,
+  judgeTheCover,
 ]
 
 export type { DiscoveryCard }
