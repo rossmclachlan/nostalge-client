@@ -45,20 +45,43 @@ export function DiscoveryCard({
           </div>
         )}
 
-        {/* Sleeve thumbnails */}
-        {card.albums.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
+        {/* Sleeves — the artwork is the point, so give it room. */}
+        {card.albums.length === 1 && (
+          <button
+            onClick={() => onOpenAlbum(card.albums[0].id)}
+            className="mt-4 block w-44 text-left sm:w-56"
+            aria-label={`${card.albums[0].title} — ${card.albums[0].artistName}`}
+          >
+            <div className="sleeve-blend">
+              <Cover name={card.albums[0].title} src={card.albums[0].imageUrl} />
+            </div>
+            <p className="mt-2 text-xs font-semibold leading-tight text-ink">
+              {card.albums[0].title}
+            </p>
+            <p className="text-xs leading-tight text-ink-3">
+              {card.albums[0].artistName}
+            </p>
+          </button>
+        )}
+        {card.albums.length > 1 && (
+          <div className="mt-4 grid max-w-xl grid-cols-3 gap-3">
             {card.albums.map((album) => (
               <button
                 key={album.id}
                 onClick={() => onOpenAlbum(album.id)}
-                className="w-14 shrink-0 sm:w-16"
+                className="text-left"
                 aria-label={`${album.title} — ${album.artistName}`}
                 title={`${album.title} — ${album.artistName}`}
               >
                 <div className="sleeve-blend">
                   <Cover name={album.title} src={album.imageUrl} />
                 </div>
+                <p className="mt-1.5 truncate text-[0.65rem] font-semibold leading-tight text-ink">
+                  {album.title}
+                </p>
+                <p className="truncate text-[0.65rem] leading-tight text-ink-3">
+                  {album.artistName}
+                </p>
               </button>
             ))}
           </div>

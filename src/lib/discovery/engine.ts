@@ -11,6 +11,8 @@ export type CardCategory =
   | 'geo'
   | 'loved'
   | 'calculated'
+  | 'genre'
+  | 'wildcard'
 
 export interface CardAlbum {
   id: string
@@ -42,6 +44,8 @@ export const CATEGORY_META: Record<
   geo: { label: 'Geography', dot: 'var(--color-riso-olive)' },
   loved: { label: 'Loved', dot: 'var(--color-riso-red)' },
   calculated: { label: 'Calculated', dot: 'var(--color-riso-olive)' },
+  genre: { label: 'Genre', dot: 'var(--color-riso-olive)' },
+  wildcard: { label: 'Wildcard', dot: 'var(--color-riso-yellow)' },
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,9 +60,11 @@ export interface EngineCtx {
   /** albumId -> sorted (asc) epoch-ms timestamps of its cached plays */
   albumPlays: Map<string, number[]>
   toCardAlbum: (a: Album) => CardAlbum
+  /** Seeded RNG — lets generators rotate their picks per shuffle. */
+  rand: () => number
 }
 
-export function buildContext(data: MusicData, now: number): EngineCtx {
+export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx {
   const albumById = new Map(data.albums.map((a) => [a.id, a]))
   const artistNameById = new Map(data.artists.map((a) => [a.id, a.name]))
 
@@ -80,10 +86,19 @@ export function buildContext(data: MusicData, now: number): EngineCtx {
     imageUrl: a.image_url || undefined,
   })
 
-  return { now, albums: data.albums, albumById, artistNameById, albumPlays, toCardAlbum }
+  return {
+    now,
+    albums: data.albums,
+    albumById,
+    artistNameById,
+    albumPlays,
+    toCardAlbum,
+    rand: rng(seed),
+  }
 }
 
-export type CardGenerator = (ctx: EngineCtx) => DiscoveryCard | null
+/** A generator may deal one card, several (e.g. one per rotating tag), or none. */
+export type CardGenerator = (ctx: EngineCtx) => DiscoveryCard | DiscoveryCard[] | null
 
 /* ------------------------------------------------------------------ */
 /*  Selection                                                          */
@@ -135,13 +150,14 @@ export function selectCards(
   generators: CardGenerator[],
   ctx: EngineCtx,
   seed: number,
-  count = 5,
+  count = 20,
 ): DiscoveryCard[] {
   const cards: DiscoveryCard[] = []
   for (const gen of generators) {
     try {
-      const card = gen(ctx)
-      if (card) cards.push(card)
+      const out = gen(ctx)
+      if (Array.isArray(out)) cards.push(...out)
+      else if (out) cards.push(out)
     } catch {
       // a misbehaving generator should never break the feed
     }

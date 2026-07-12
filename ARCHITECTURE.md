@@ -37,7 +37,7 @@ src/
     cn.ts                    clsx + tailwind-merge className helper
     discovery/
       engine.ts              Card model, EngineCtx builder, seeded weighted selection, shown-tracking
-      cards.ts               26 card generators (16 active, 10 dormant); GENERATORS array
+      cards.ts               32 card generators (22 active, 10 dormant); GENERATORS array
 
   components/
     App.tsx                  Root island: tab state, detail navigation stack, discoverySeed, Masthead
@@ -97,9 +97,9 @@ Local cache shapes:
 
 ## Discovery engine (`src/lib/discovery/`)
 The Discovery tab is a **data engine kept separate from the UI**.
-- `engine.ts` — `buildContext(data, now)` precomputes `albumById`, `artistNameById`, and `albumPlays` (albumId → ascending epoch-ms timestamps). `selectCards(generators, ctx, seed, 5)` runs every generator in try/catch, drops nulls, **forces in** `on-this-day`, then does **Efraimidis–Spirakis weighted sampling** (`weight = (0.25 + narrativeScore) * (recentlyShown ? 0.25 : 1)`, recency from `nostalge:discovery:shown:v1`, 7-day window), then a seeded (mulberry32) Fisher–Yates shuffle of the final 5. `DiscoveryTab` writes `recordShown` after render.
-- `cards.ts` — `GENERATORS`, **26 total: 16 active, 10 dormant** (`() => null`). A generator returns a `DiscoveryCard` (headline, subheadline, optional big `metric`, 1–6 albums, CTA, `narrativeScore`) or `null` to be skipped.
-  - **Active** (from cached albums/artists/plays): On This Day, This Month That Year, Late Night, Morning Stack, Weekend, Sunday, Almost There, Century Club, First Listen Flashback, Forgotten Gems, Long Hiatus, One Summer, Fading Favourites, Fast Burner (plays/yr — *ownership proxied by first cached play*), The B-Side, The Grower.
+- `engine.ts` — `buildContext(data, now, seed)` precomputes `albumById`, `artistNameById`, and `albumPlays` (albumId → ascending epoch-ms timestamps), plus a seeded `rand` generators use to rotate their picks per shuffle. `selectCards(generators, ctx, seed, 20)` runs every generator in try/catch (a generator may return one card, an array of cards, or null), drops nulls, **forces in** `on-this-day`, then does **Efraimidis–Spirakis weighted sampling** (`weight = (0.25 + narrativeScore) * (recentlyShown ? 0.25 : 1)`, recency from `nostalge:discovery:shown:v1`, 7-day window), then a seeded (mulberry32) Fisher–Yates shuffle of the final 20. `DiscoveryTab` writes `recordShown` after render.
+- `cards.ts` — `GENERATORS`, **32 total: 22 active, 10 dormant** (`() => null`). A generator returns a `DiscoveryCard` (headline, subheadline, optional big `metric`, 1–6 albums, CTA, `narrativeScore`), an array of cards (the tag/year families emit several per deal), or `null` to be skipped.
+  - **Active** (from cached albums/artists/plays): On This Day, This Month That Year, Late Night, Morning Stack, Weekend, Sunday, Almost There, Century Club, First Listen Flashback, Forgotten Gems, Long Hiatus, One Summer, Fading Favourites, Fast Burner (plays/yr — *ownership proxied by first cached play*), The B-Side, The Grower, plus the non-recency families: Genre Spotlight (×3, rotating tag), Lucky Dip (×2, random pull from a rotating tag crate), Blind Pull (6 random sleeves), Class of YYYY (×2, year of first cached play), Pressed in YYYY (×2, Last.fm year tags as release years), The Underplayed, The Completist.
   - **Dormant** (wired in, always `null` until backend data exists): One Hit Wonders, Deep Cut Ratio, Never Finished, All Killer (need **per-track plays** — tracks aren't cached); From Somewhere New (no **artist country**); Decade Deep Dive (no **release year**); Short and Sweet, Commitment Test (no cached **album duration**); Loved But Unplayed, Sleeper Loved (no **"loved"** field).
 - `DiscoveryTab.tsx` — runs the engine via `useMemo([data, seed])`, renders up to 5 `DiscoveryCard`s, Shuffle button (`onReroll` re-seeds), and a "come back soon" empty state when `< 3` cards have data.
 

@@ -38,6 +38,41 @@ function fraction(plays: number[], pred: (ms: number) => boolean): number {
   return n / plays.length
 }
 
+/** Albums grouped by (lowercased) tag name. */
+function albumsByTag(ctx: EngineCtx): Map<string, Album[]> {
+  const byTag = new Map<string, Album[]>()
+  for (const a of ctx.albums) {
+    if (!Array.isArray(a.tags)) continue
+    for (const raw of a.tags) {
+      const tag = String(raw).trim().toLowerCase()
+      if (!tag) continue
+      const arr = byTag.get(tag)
+      if (arr) arr.push(a)
+      else byTag.set(tag, [a])
+    }
+  }
+  return byTag
+}
+
+/** Seeded pick of up to `n` distinct items. */
+function pickDistinct<T>(arr: T[], n: number, rand: () => number): T[] {
+  const pool = [...arr]
+  const out: T[] = []
+  while (out.length < n && pool.length > 0) {
+    out.push(pool.splice(Math.floor(rand() * pool.length), 1)[0])
+  }
+  return out
+}
+
+/** "indie pop" → "Indie Pop"; short tags like "idm" read as acronyms → "IDM". */
+const titleCase = (s: string) =>
+  s.length <= 3 ? s.toUpperCase() : s.replace(/\b[a-z]/g, (c) => c.toUpperCase())
+
+/** Last.fm year tags ("2013") — treated as release years, not genres. */
+const YEAR_TAG = /^(19|20)\d{2}$/
+
+const byPlays = (a: Album, b: Album) => (b.play_count || 0) - (a.play_count || 0)
+
 /* ================================================================== */
 /*  TEMPORAL                                                          */
 /* ================================================================== */
@@ -487,6 +522,167 @@ const theGrower: CardGenerator = (ctx) => {
 }
 
 /* ================================================================== */
+/*  GENRE & WILDCARD — not tied to listening recency                  */
+/* ================================================================== */
+
+/** A few of the bigger genre shelves, rotated per shuffle. */
+const genreSpotlight: CardGenerator = (ctx) => {
+  const ranked = [...albumsByTag(ctx).entries()]
+    .filter(([tag, list]) => !YEAR_TAG.test(tag) && list.length >= 4)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 24)
+  if (ranked.length === 0) return null
+
+  return pickDistinct(ranked, 3, ctx.rand).map(([tag, list]) => ({
+    id: `genre-spotlight-${tag}`,
+    category: 'genre' as const,
+    headline: titleCase(tag),
+    subheadline: `A wander through the ${tag} shelves.`,
+    metric: { value: String(list.length), label: 'records in the crate' },
+    albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
+    cta: 'Dig in',
+    narrativeScore: 0.55,
+  }))
+}
+
+/** One record pulled blind from a rotating genre crate. */
+const luckyDip: CardGenerator = (ctx) => {
+  const eligible = [...albumsByTag(ctx).entries()].filter(
+    ([tag, l]) => !YEAR_TAG.test(tag) && l.length >= 3,
+  )
+  if (eligible.length === 0) return null
+
+  return pickDistinct(eligible, 2, ctx.rand).map(([tag, list]) => {
+    const album = list[Math.floor(ctx.rand() * list.length)]
+    return {
+      id: `lucky-dip-${tag}`,
+      category: 'wildcard' as const,
+      headline: 'Lucky Dip',
+      subheadline: `Pulled blind from the ${tag} crate.`,
+      metric:
+        album.play_count > 0
+          ? { value: String(album.play_count), label: 'plays so far' }
+          : undefined,
+      albums: [ctx.toCardAlbum(album)],
+      cta: 'Put it on',
+      narrativeScore: 0.5,
+    }
+  })
+}
+
+/** Six sleeves pulled at random from the whole crate. */
+const blindPull: CardGenerator = (ctx) => {
+  if (ctx.albums.length < 12) return null
+  const picks = pickDistinct(ctx.albums, 6, ctx.rand)
+  return {
+    id: 'blind-pull',
+    category: 'wildcard',
+    headline: 'Blind Pull',
+    subheadline: `Six sleeves grabbed at random. No agenda.`,
+    albums: picks.map(ctx.toCardAlbum),
+    cta: 'Take a chance',
+    narrativeScore: 0.45,
+  }
+}
+
+/**
+ * Albums that first showed up in the crate a given year, rotated per shuffle.
+ * "First showed up" = earliest cached play, so the span is bounded by the
+ * play cache window — a release-year field on the backend would widen this.
+ */
+const classOf: CardGenerator = (ctx) => {
+  const thisYear = new Date(ctx.now).getFullYear()
+  const byYear = new Map<number, Album[]>()
+  for (const a of ctx.albums) {
+    const plays = ctx.albumPlays.get(a.id)
+    if (!plays || plays.length === 0) continue
+    const y = new Date(plays[0]).getFullYear()
+    if (y >= thisYear) continue
+    const arr = byYear.get(y)
+    if (arr) arr.push(a)
+    else byYear.set(y, [a])
+  }
+  const years = [...byYear.entries()].filter(([, list]) => list.length >= 4)
+  if (years.length === 0) return null
+
+  return pickDistinct(years, 2, ctx.rand).map(([year, list]) => ({
+    id: `class-of-${year}`,
+    category: 'temporal' as const,
+    headline: `Class of ${year}`,
+    subheadline: `Records that first hit the crate that year.`,
+    metric: { value: String(list.length), label: 'new arrivals' },
+    albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
+    cta: 'Revisit the intake',
+    narrativeScore: 0.6,
+  }))
+}
+
+/** Albums released a given year (via Last.fm year tags), rotated per shuffle. */
+const pressedIn: CardGenerator = (ctx) => {
+  const years = [...albumsByTag(ctx).entries()].filter(
+    ([tag, list]) => YEAR_TAG.test(tag) && list.length >= 3,
+  )
+  if (years.length === 0) return null
+
+  return pickDistinct(years, 2, ctx.rand).map(([year, list]) => ({
+    id: `pressed-in-${year}`,
+    category: 'temporal' as const,
+    headline: `Pressed in ${year}`,
+    subheadline: `Records from the year ${year} shelf.`,
+    metric: { value: String(list.length), label: 'in the crate' },
+    albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
+    cta: 'Spin the year',
+    narrativeScore: 0.6,
+  }))
+}
+
+/** Owned but barely explored — uses all-time play counts, not the cache window. */
+const theUnderplayed: CardGenerator = (ctx) => {
+  const candidates = ctx.albums.filter(
+    (a) => a.play_count >= 1 && a.play_count <= 15,
+  )
+  if (candidates.length < 6) return null
+  const picks = pickDistinct(candidates, 6, ctx.rand)
+  return {
+    id: 'the-underplayed',
+    category: 'neglect',
+    headline: 'The Underplayed',
+    subheadline: `In the crate, barely cracked. Fewer than a handful of spins each.`,
+    albums: picks.map(ctx.toCardAlbum),
+    cta: 'Give one a shot',
+    narrativeScore: 0.55,
+  }
+}
+
+/** The artist you keep buying — most records in the crate. */
+const theCompletist: CardGenerator = (ctx) => {
+  const byArtist = new Map<string, Album[]>()
+  for (const a of ctx.albums) {
+    const arr = byArtist.get(a.artist)
+    if (arr) arr.push(a)
+    else byArtist.set(a.artist, [a])
+  }
+  const ranked = [...byArtist.entries()]
+    .filter(([, list]) => list.length >= 4)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 8)
+  if (ranked.length === 0) return null
+
+  const [artistId, list] = pickDistinct(ranked, 1, ctx.rand)[0]
+  const name = ctx.artistNameById.get(artistId) ?? 'Unknown'
+  return {
+    id: `the-completist-${artistId}`,
+    category: 'calculated',
+    headline: 'The Completist',
+    subheadline: `You keep coming back for ${name}.`,
+    metric: { value: String(list.length), label: 'records in the crate' },
+    albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
+    cta: 'Line them up',
+    narrativeScore: 0.6,
+  }
+}
+
+/* ================================================================== */
 /*  Registry                                                          */
 /* ================================================================== */
 
@@ -523,6 +719,14 @@ export const GENERATORS: CardGenerator[] = [
   playsPerYear,
   theBSide,
   theGrower,
+  theCompletist,
+  // genre & wildcard
+  genreSpotlight,
+  luckyDip,
+  blindPull,
+  classOf,
+  pressedIn,
+  theUnderplayed,
 ]
 
 export type { DiscoveryCard }

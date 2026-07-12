@@ -18,8 +18,8 @@ export function DiscoveryTab({
   onOpenAlbum: (id: string) => void
 }) {
   const cards = useMemo(() => {
-    const ctx = buildContext(data, Date.now())
-    return selectCards(GENERATORS, ctx, seed, 5)
+    const ctx = buildContext(data, Date.now(), seed)
+    return selectCards(GENERATORS, ctx, seed, 20)
   }, [data, seed])
 
   // Remember what we showed so the next shuffle can favour fresh cards.
