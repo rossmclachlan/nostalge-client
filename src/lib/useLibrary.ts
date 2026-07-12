@@ -1,6 +1,13 @@
 import { useCallback, useState } from 'react'
 import { hasData, loadCache, saveCache } from './cache'
-import { fetchAlbums, fetchArtists, fetchPlays, fetchTags, healthCheck } from './pb'
+import {
+  fetchAlbums,
+  fetchArtists,
+  fetchPlays,
+  fetchTags,
+  fetchTracks,
+  healthCheck,
+} from './pb'
 import type { ConnectionState, MusicData } from './types'
 
 interface LibraryState {
@@ -36,11 +43,12 @@ export function useLibrary(): LibraryState {
       const live = await healthCheck()
       if (!live) return // keep cached/empty state
 
-      const [artists, albums, tags, plays] = await Promise.all([
+      const [artists, albums, tags, plays, tracks] = await Promise.all([
         fetchArtists(),
         fetchAlbums(),
         fetchTags(),
         fetchPlays(),
+        fetchTracks(),
       ])
 
       // Only commit a fresh fetch if it actually returned something — a
@@ -52,6 +60,7 @@ export function useLibrary(): LibraryState {
         albums,
         tags,
         plays,
+        tracks,
         fetchedAt: Date.now(),
       }
       saveCache(fresh)

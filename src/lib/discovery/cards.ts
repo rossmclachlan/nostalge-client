@@ -293,11 +293,67 @@ const firstListenFlashback: CardGenerator = (ctx) => {
   }
 }
 
-// One Hit Wonders / Deep Cut Ratio need per-track play distribution, which
-// isn't cached (tracks are fetched per-album on demand). They stay dormant
-// until track-level plays are cached library-wide.
-const oneHitWonders: CardGenerator = () => null
-const deepCutRatio: CardGenerator = () => null
+/** One track carries most of the album's plays. */
+const oneHitWonders: CardGenerator = (ctx) => {
+  let best: { album: Album; hit: string; share: number } | null = null
+  for (const a of ctx.albums) {
+    const tracks = ctx.tracksByAlbum.get(a.id)
+    if (!tracks || tracks.length < 4) continue
+    let total = 0
+    let top = tracks[0]
+    for (const t of tracks) {
+      total += t.p
+      if (t.p > top.p) top = t
+    }
+    if (total < 20) continue
+    const share = top.p / total
+    if (share >= 0.6 && (!best || share > best.share))
+      best = { album: a, hit: top.t, share }
+  }
+  if (!best) return null
+  return {
+    id: 'one-hit-wonders',
+    category: 'milestone',
+    headline: 'One-Hit Wonder',
+    subheadline: `You mostly come for one track — “${best.hit}”. The rest is waiting.`,
+    metric: { value: `${pct(best.share)}%`, label: 'of the album’s plays' },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Hear the rest',
+    narrativeScore: 0.75,
+  }
+}
+
+/** Even play distribution — you spin the whole thing, no track left behind. */
+const deepCutRatio: CardGenerator = (ctx) => {
+  let best: { album: Album; evenness: number; tracks: number } | null = null
+  for (const a of ctx.albums) {
+    const tracks = ctx.tracksByAlbum.get(a.id)
+    if (!tracks || tracks.length < 5) continue
+    let total = 0
+    let min = Infinity
+    let max = 0
+    for (const t of tracks) {
+      total += t.p
+      if (t.p < min) min = t.p
+      if (t.p > max) max = t.p
+    }
+    if (total < 25 || max === 0 || min < 1) continue // every track has plays
+    const evenness = min / max
+    if (evenness >= 0.5 && (!best || evenness > best.evenness))
+      best = { album: a, evenness, tracks: tracks.length }
+  }
+  if (!best) return null
+  return {
+    id: 'deep-cut-ratio',
+    category: 'milestone',
+    headline: 'No Skips',
+    subheadline: `You play this one front to back — every track pulls its weight.`,
+    metric: { value: String(best.tracks), label: 'tracks, none skipped' },
+    albums: [ctx.toCardAlbum(best.album)],
+    cta: 'Put it on',
+    narrativeScore: 0.7,
+  }
+}
 
 /* ================================================================== */
 /*  NEGLECT / RECENCY                                                 */
@@ -425,10 +481,35 @@ const commitmentTest: CardGenerator = () => null
 /*  LOVED TRACKS                                                      */
 /* ================================================================== */
 
-// All dormant: there is no "loved" field anywhere in the PocketBase schema.
+// lovedButUnplayed / sleeperLoved need a "loved" flag, which the schema
+// doesn't have — still dormant.
 const lovedButUnplayed: CardGenerator = () => null
-const allKiller: CardGenerator = () => null
 const sleeperLoved: CardGenerator = () => null
+
+/** Every track on the album has been played at least once. */
+const allKiller: CardGenerator = (ctx) => {
+  const picks: Album[] = []
+  for (const a of ctx.albums) {
+    if (!a.track_count || a.track_count < 6) continue
+    const tracks = ctx.tracksByAlbum.get(a.id)
+    // Need the full tracklist, otherwise "every track played" isn't trustworthy.
+    if (!tracks || tracks.length < a.track_count) continue
+    if (tracks.every((t) => t.p >= 1)) picks.push(a)
+  }
+  if (picks.length === 0) return null
+  const pick = pickDistinct(picks, 1, ctx.rand)[0]
+  const count = ctx.tracksByAlbum.get(pick.id)?.length ?? pick.track_count
+  return {
+    id: 'all-killer',
+    category: 'loved',
+    headline: 'All Killer, No Filler',
+    subheadline: `Every single track on this has earned a spin.`,
+    metric: { value: String(count), label: 'tracks, all played' },
+    albums: [ctx.toCardAlbum(pick)],
+    cta: 'Put it on',
+    narrativeScore: 0.7,
+  }
+}
 
 /* ================================================================== */
 /*  CALCULATED                                                        */

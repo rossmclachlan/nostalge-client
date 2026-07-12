@@ -64,6 +64,16 @@ export interface PlayEvent {
   at: string
 }
 
+/** A slimmed track kept locally for per-track discovery cards. */
+export interface TrackPlay {
+  /** album record id */
+  al: string
+  /** track title */
+  t: string
+  /** personal play count */
+  p: number
+}
+
 /** A recent scrobble with display details, for the Recent tab / sync check. */
 export interface RecentPlay {
   id: string
@@ -79,6 +89,8 @@ export interface MusicData {
   albums: Album[]
   tags: Tag[]
   plays: PlayEvent[]
+  /** slim per-track play counts, for per-track discovery cards */
+  tracks: TrackPlay[]
   /** epoch ms of the last successful fetch */
   fetchedAt: number
 }

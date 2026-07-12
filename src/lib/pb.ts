@@ -1,5 +1,5 @@
 import PocketBase from 'pocketbase'
-import type { Album, Artist, PlayEvent, RecentPlay, Scrobble, Tag, Track } from './types'
+import type { Album, Artist, PlayEvent, RecentPlay, Scrobble, Tag, Track, TrackPlay } from './types'
 
 /**
  * PocketBase lives on the home LAN and is only reachable some of the time.
@@ -22,6 +22,7 @@ const CAPS = {
   albums: 2000,
   tags: 300,
   plays: 4000,
+  tracks: 20000,
 }
 const PER_PAGE = 200
 
@@ -49,6 +50,7 @@ async function fetchPaged<T>(
   collection: string,
   cap: number,
   options: Record<string, unknown>,
+  perPage = PER_PAGE,
 ): Promise<T[]> {
   const out: T[] = []
   let page = 1
@@ -56,7 +58,7 @@ async function fetchPaged<T>(
     while (out.length < cap) {
       const result = await pb
         .collection(collection)
-        .getList<T>(page, PER_PAGE, { requestKey: null, ...options })
+        .getList<T>(page, perPage, { requestKey: null, ...options })
       out.push(...result.items)
       if (page >= result.totalPages || result.items.length === 0) break
       page += 1
@@ -77,6 +79,18 @@ export function fetchAlbums(): Promise<Album[]> {
 
 export function fetchTags(): Promise<Tag[]> {
   return fetchPaged<Tag>('tags', CAPS.tags, { sort: '-usage_count' })
+}
+
+/**
+ * All tracks, slimmed to { album id, title, play count }, for per-track
+ * discovery cards. Larger page size since there are many; capped and silent
+ * on failure like the rest.
+ */
+export async function fetchTracks(): Promise<TrackPlay[]> {
+  const rows = await fetchPaged<Track>('tracks', CAPS.tracks, { sort: '-play_count' }, 500)
+  return rows
+    .filter((t) => t.album)
+    .map((t) => ({ al: t.album, t: t.title, p: t.play_count || 0 }))
 }
 
 type ScrobbleExpanded = Scrobble & {

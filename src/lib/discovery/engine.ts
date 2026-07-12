@@ -60,6 +60,8 @@ export interface EngineCtx {
   artistNameById: Map<string, string>
   /** albumId -> sorted (asc) epoch-ms timestamps of its cached plays */
   albumPlays: Map<string, number[]>
+  /** albumId -> its tracks' { play count, title } (for per-track cards) */
+  tracksByAlbum: Map<string, { p: number; t: string }[]>
   toCardAlbum: (a: Album) => CardAlbum
   /** Seeded RNG — lets generators rotate their picks per shuffle. */
   rand: () => number
@@ -75,17 +77,25 @@ const DISCOVERY_EXCLUSIONS: { artist: string; title: string }[] = [
   { artist: 'nils frahm', title: 'screws' },
 ]
 
+/** Whole artists kept out of Discovery (matched case-insensitively). */
+const EXCLUDED_ARTISTS = new Set(['jings', 'whiteshaw'])
+
+/** Titles that aren't "proper" albums — demos, bootlegs, outtakes. Matched as
+ *  whole words, so "Demon Days" / "Demolition" are safe. Add words as needed. */
+const EXCLUDED_TITLE_RE = /\b(demos?|bootlegs?|outtakes?)\b/i
+
 export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx {
   const albumById = new Map(data.albums.map((a) => [a.id, a]))
   const artistById = new Map(data.artists.map((a) => [a.id, a]))
   const artistNameById = new Map(data.artists.map((a) => [a.id, a.name]))
 
-  const excluded = (a: Album) =>
-    DISCOVERY_EXCLUSIONS.some(
-      (x) =>
-        a.title.toLowerCase() === x.title &&
-        (artistNameById.get(a.artist) ?? '').toLowerCase() === x.artist,
-    )
+  const excluded = (a: Album) => {
+    const artist = (artistNameById.get(a.artist) ?? '').toLowerCase()
+    const title = a.title.toLowerCase()
+    if (EXCLUDED_ARTISTS.has(artist)) return true
+    if (EXCLUDED_TITLE_RE.test(a.title)) return true
+    return DISCOVERY_EXCLUSIONS.some((x) => title === x.title && artist === x.artist)
+  }
   const albums = data.albums.filter((a) => !excluded(a))
 
   const albumPlays = new Map<string, number[]>()
@@ -98,6 +108,14 @@ export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx 
     else albumPlays.set(p.al, [t])
   }
   for (const arr of albumPlays.values()) arr.sort((a, b) => a - b)
+
+  const tracksByAlbum = new Map<string, { p: number; t: string }[]>()
+  for (const tr of data.tracks ?? []) {
+    if (!tr.al) continue
+    const arr = tracksByAlbum.get(tr.al)
+    if (arr) arr.push({ p: tr.p || 0, t: tr.t })
+    else tracksByAlbum.set(tr.al, [{ p: tr.p || 0, t: tr.t }])
+  }
 
   const toCardAlbum = (a: Album): CardAlbum => ({
     id: a.id,
@@ -113,6 +131,7 @@ export function buildContext(data: MusicData, now: number, seed = 1): EngineCtx 
     artistById,
     artistNameById,
     albumPlays,
+    tracksByAlbum,
     toCardAlbum,
     rand: rng(seed),
   }
