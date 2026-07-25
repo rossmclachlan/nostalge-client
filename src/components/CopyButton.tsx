@@ -11,10 +11,13 @@ import { CheckIcon, CopyIcon } from './icons'
 export function CopyButton({
   text,
   label = 'Copy',
+  ariaLabel,
   className,
 }: {
   text: string
   label?: string
+  /** Use when `text` is long — the default label reads the whole string out. */
+  ariaLabel?: string
   className?: string
 }) {
   const [copied, setCopied] = useState(false)
@@ -56,7 +59,7 @@ export function CopyButton({
   return (
     <button
       onClick={copy}
-      aria-label={`Copy "${text}" to clipboard`}
+      aria-label={ariaLabel ?? `Copy "${text}" to clipboard`}
       className={cn(
         'btn-press inline-flex items-center gap-1.5 px-2.5 py-1 text-xs',
         copied && 'bg-riso-olive text-paper',

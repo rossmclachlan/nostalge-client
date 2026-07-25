@@ -13,15 +13,19 @@ import { TagsTab } from './tags/TagsTab'
 import { TagDetail } from './tags/TagDetail'
 import { StatsTab } from './stats/StatsTab'
 import { RecentTab } from './recent/RecentTab'
+import { PlaylistsTab } from './playlists/PlaylistsTab'
+import { PlaylistDetail } from './playlists/PlaylistDetail'
 
 type Detail =
   | { kind: 'artist'; id: string }
   | { kind: 'album'; id: string }
   | { kind: 'tag'; id: string }
+  | { kind: 'playlist'; id: string }
 
 const TAB_TITLES: Record<Tab, string> = {
   crates: 'Crates',
   discovery: 'Discovery',
+  playlists: 'Sets',
   tags: 'Tags',
   stats: 'Stats',
   recent: 'Recent',
@@ -64,6 +68,7 @@ export default function App() {
   const openArtist = useCallback((id: string) => push({ kind: 'artist', id }), [push])
   const openAlbum = useCallback((id: string) => push({ kind: 'album', id }), [push])
   const openTag = useCallback((id: string) => push({ kind: 'tag', id }), [push])
+  const openPlaylist = useCallback((id: string) => push({ kind: 'playlist', id }), [push])
 
   const changeTab = useCallback((next: Tab) => {
     savedScroll.current = []
@@ -107,6 +112,13 @@ export default function App() {
               onOpenAlbum={openAlbum}
             />
           )}
+          {detail.kind === 'playlist' && (
+            <PlaylistDetail
+              playlistId={detail.id}
+              onBack={back}
+              onOpenAlbum={openAlbum}
+            />
+          )}
         </div>
       ) : (
         <>
@@ -125,6 +137,9 @@ export default function App() {
                 onReroll={() => setDiscoverySeed(newSeed())}
                 onOpenAlbum={openAlbum}
               />
+            )}
+            {tab === 'playlists' && (
+              <PlaylistsTab data={data} onOpenPlaylist={openPlaylist} />
             )}
             {tab === 'tags' && <TagsTab data={data} onOpenTag={openTag} />}
             {tab === 'stats' && (

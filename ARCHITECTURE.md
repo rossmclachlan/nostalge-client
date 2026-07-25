@@ -10,6 +10,8 @@ Live: `https://rossmclachlan.github.io/nostalge-client/`
 - **TypeScript** (strict), path alias `@/* → src/*`.
 - **Tailwind CSS v4** via `@tailwindcss/vite` (no `tailwind.config.js`; design tokens live in CSS `@theme`).
 - **PocketBase JS SDK** `0.21.5` (pinned).
+- **@anthropic-ai/sdk** — playlist builder only, **dynamically imported** so it stays
+  out of the app shell (see Playlist builder below).
 - **@vite-pwa/astro** (Workbox) for the installable PWA + offline app shell.
 - No test suite, no linter config, no `tailwind.config.js`, no `CLAUDE.md`.
 
@@ -38,6 +40,18 @@ src/
     discovery/
       engine.ts              Card model, EngineCtx builder, seeded weighted selection, shown-tracking
       cards.ts               32 card generators (22 active, 10 dormant); GENERATORS array
+    playlist/
+      taste.ts               PLANNER_TASTE / CURATOR_TASTE — the shipped curatorial opinions
+      types.ts               PlaylistPlan, Candidate, Playlist, RunStage, RunFailure
+      schema.ts              JSON Schemas for the two structured-output calls
+      normalise.ts           Coerce/clamp model output into trustworthy shapes
+      claude.ts              Key storage, lazy SDK import, the single API call. Never throws.
+      digest.ts              Compact collection portrait for the planner (the cached prefix)
+      plan.ts                Stage 1 — prompt -> PlaylistPlan
+      execute.ts             Stage 2 — PlaylistPlan + MusicData -> Candidate[]. PURE, no network.
+      curate.ts              Stage 3 — candidates -> sequenced playlist; enforces the ref guarantee
+      run.ts                 usePlaylistRun() — orchestrates the three stages
+      store.ts               localStorage for saved playlists
 
   components/
     App.tsx                  Root island: tab state, detail navigation stack, discoverySeed, Masthead
@@ -50,6 +64,8 @@ src/
     ui.tsx                   Shared primitives: SectionHeader, Chip, PlayBadge, EmptyState
     icons.tsx                Inline SVG icon set
     crates/  CratesTab.tsx (album grid + search), AlbumDetail.tsx, ArtistDetail.tsx
+    playlists/ PlaylistsTab.tsx (prompt + shelf), RunPanel.tsx (the build, made visible),
+               PlaylistDetail.tsx, KeyGate.tsx (API key entry)
     discovery/ DiscoveryTab.tsx (runs engine, renders cards, shuffle), DiscoveryCard.tsx
     tags/    TagsTab.tsx (divider-card index), TagDetail.tsx (albums shuffleable + artists)
     stats/   StatsTab.tsx (headline figures + top lists)
@@ -86,11 +102,11 @@ Local cache shapes:
 - **`useRecentPlays()`** — same pattern with its own cache key; also manual-refresh only.
 
 ### localStorage keys
-`nostalge:data:v1` (library) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:theme` (`light`/`dark`).
+`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:anthropic-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`).
 
 ## UI / navigation (`src/components/App.tsx`)
-- **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | crates | tags | stats | recent`. Bottom-nav order: **Discover, Crates, Tags, Stats, Recent**. Default tab: **discovery**.
-- **Navigation stack**: `stack: Detail[]`, `Detail = { kind: 'artist'|'album'|'tag'; id }`. When `stack` is non-empty, App renders the matching detail view (in a `max-w-2xl` readable column) instead of the tab body; `back` pops. `changeTab` clears the stack, sets the tab, re-rolls the discovery seed when entering Discovery, scrolls to top.
+- **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | crates | playlists | tags | stats | recent`. Bottom-nav order: **Discover, Crates, Sets, Tags, Stats, Recent**. Default tab: **discovery**. The grid is `grid-cols-6`.
+- **Navigation stack**: `stack: Detail[]`, `Detail = { kind: 'artist'|'album'|'tag'|'playlist'; id }`. When `stack` is non-empty, App renders the matching detail view (in a `max-w-2xl` readable column) instead of the tab body; `back` pops. `changeTab` clears the stack, sets the tab, re-rolls the discovery seed when entering Discovery, scrolls to top.
 - **`discoverySeed`** lives in `App` (not in `DiscoveryTab`) so the Discovery selection **survives drilling into a detail and pressing Back**; it re-rolls only on deliberate tab entry or Shuffle.
 - **Masthead**: "Nostalge" kicker + tab title, a `ConnectionFlag` (syncing / live / "off the shelf" / "no signal"), plus `InstallButton`, `ThemeToggle`, and a spin-while-syncing Refresh button.
 - **Responsive**: full-width container; grids scale 2 → sm:3 → md/lg:4–5 → xl:6 columns; detail pages capped at `max-w-2xl`.
@@ -105,6 +121,58 @@ The Discovery tab is a **data engine kept separate from the UI**.
 
 > **Highest-value data-layer extension:** caching track-level plays would unlock the 4 per-track cards without any backend schema change. Country/year/duration/loved need new backend fields.
 
+## Playlist builder (`src/lib/playlist/`)
+
+The Sets tab turns a sentence ("something quiet I haven't played in years") into a
+tracklist drawn from the collection. It runs in **three stages with a deterministic
+middle**:
+
+```
+prompt ─▶ [Claude: PLAN] ─▶ PlaylistPlan ─▶ [execute.ts] ─▶ Candidate[] ─▶ [Claude: CURATE] ─▶ Playlist
+```
+
+**The model never names a track from memory.** Stage 1 emits a *query*; `execute.ts`
+runs that query against the cached library; stage 3 may only pick from the rows
+`execute.ts` produced, and `curate.ts` drops any ref that wasn't offered. Every track in
+every playlist provably exists in the collection. The plan's `max_per_artist` /
+`max_per_album` are enforced on acceptance too, so a playlist can't violate its own brief.
+
+- **`execute.ts` is pure** — no network, no clock, no localStorage (`now` and `seed` are
+  arguments). It reuses `buildContext()` from the discovery engine, so the collection-wide
+  exclusions apply for free. It is the half worth testing, and it needs no API key.
+- **It runs off the cache.** `MusicData.tracks` already carries per-track play counts, so
+  building needs no PocketBase call — only api.anthropic.com. Saved playlists open fully
+  offline.
+- **Candidate selection is round-robin by album**, so one record can't eat an artist's
+  whole allowance and the curator keeps a real choice of *which* track from a record.
+- **`taste.ts` is the point.** `PLANNER_TASTE` covers how to read a request (mood over
+  genre, over-fetch, lean toward neglect because this is a rediscovery app); `CURATOR_TASTE`
+  covers sequencing arc, the familiar/forgotten mix, deep cuts, and the voice of the liner
+  note. Tune these first — no logic changes needed.
+- **Honest filters only.** The plan schema can only express what the data knows: tags, play
+  counts, scrobble recency and hour, release year *as a Last.fm year tag*. It cannot express
+  tempo, key, energy, duration, country, or "loved" — the same gaps that keep 10 discovery
+  generators dormant. The planner prompt names them so the model doesn't emit a filter
+  `execute.ts` would silently ignore.
+
+### The API key
+There is no server, so the key is the user's own, in their own browser
+(`nostalge:anthropic-key:v1`), sent straight to Anthropic. `claude.ts` sets
+`dangerouslyAllowBrowser: true` — required, and what makes the SDK send the
+`anthropic-dangerous-direct-browser-access` header that unlocks CORS. **`claude.ts` is the
+only file that talks to the API**: to move the key server-side later (a Worker, or a route
+on the NAS behind Tailscale), repoint that file and change nothing else.
+
+### Cost and caching
+The system prompt (taste + digest) is marked `cache_control: ephemeral` and only changes
+when the library re-syncs, so every later run in a session reads it back at ~0.1×. Stage 1
+runs at `medium` effort, stage 3 at `high`. A playlist costs cents.
+
+### Failure
+Every stage returns a `RunFailure` value rather than throwing: `no_key`, `no_data`,
+`offline`, `refused`, `empty`, `unknown`. `RunPanel` renders each as a quiet card. This is
+the "never an error state" rule applied to a feature that genuinely depends on a network.
+
 ## Theming / design system (`src/styles/global.css`)
 - **Tokens in `@theme`**: paper/ink palette (`--color-paper*`, `--color-ink*`, `--color-kraft`), riso accents (`--color-riso-red/olive/yellow/blue`), fonts (`--font-display` Bebas Neue, `--font-body` Archivo — loaded via Google Fonts in `Layout.astro`), `--radius-sticker`, `--shadow-ink`, `--nav-active-bg`.
 - **Dark mode is a token swap**, not per-component variants. A `.dark {}` block overrides those custom properties; every component consumes token colors (`bg-paper`, `text-ink`, `border-ink`, etc.), so one class flip re-themes the whole app. `--shadow-ink` and `--nav-active-bg` are themed so the hard offset shadows and the selected-tab block still read on dark. `.dark .sleeve-blend` disables the multiply blend so cover art doesn't crush to black.
@@ -114,6 +182,11 @@ The Discovery tab is a **data engine kept separate from the UI**.
 ## PWA / service worker
 - `@vite-pwa/astro` with `registerType: 'autoUpdate'`, `injectRegister: false`. Because vite-plugin-pwa's HTML injection doesn't run on Astro's generated pages, the **manifest link and SW registration are hand-wired in `Layout.astro`** (base-path aware).
 - Workbox: `skipWaiting: true` + `clientsClaim: true` (new SW takes over open pages immediately), app-shell precache, and a `cover-art` CacheFirst runtime cache for images.
+- **The Anthropic SDK is deliberately not precached.** A `manualChunks` rule in
+  `astro.config.mjs` gives it a stable `anthropic.*.js` name and `globIgnores` keeps it out
+  of the precache manifest — it is ~170 kB that only the Sets tab loads, and that feature
+  needs the network anyway. Precache stays at ~385 KiB. If you rename that chunk, update the
+  `globIgnores` pattern with it.
 - Registration script tracks `hadController` (so a fresh install doesn't reload), reloads once on `controllerchange` (new build activates without a manual hard refresh), and calls `reg.update()` on `visibilitychange`.
 - Manifest `scope`/`start_url`/`id` all pinned to `/nostalge-client/`.
 
@@ -124,7 +197,7 @@ The Discovery tab is a **data engine kept separate from the UI**.
 - After deploy, the auto-updating SW means clients pick up the new build on next open (no reinstall).
 
 ## Conventions & gotchas for the next contributor
-- **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch. Keep the grid at `grid-cols-5`.
+- **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch, and bump `grid-cols-N` to match. Six is comfortable on a 390px phone; a seventh would need shorter labels.
 - **Add a discovery card**: write a `CardGenerator` in `cards.ts` returning a `DiscoveryCard | null` and add it to `GENERATORS`. Enforce "enough data" inside the generator and return `null` otherwise.
 - **New PocketBase field**: add it to the interface in `types.ts`, fetch it in `pb.ts` (respect the caps + `requestKey: null`), and it flows through the cache automatically.
 - **Colors**: only touch `@theme` and the `.dark` block; never hardcode hex in components — use token utilities so dark mode keeps working.

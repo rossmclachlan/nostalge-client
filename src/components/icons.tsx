@@ -82,6 +82,14 @@ export const ClockIcon = (p: P) => (
   </svg>
 )
 
+export const ListIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M4 6h11M4 12h11M4 18h7" />
+    <circle cx="18.5" cy="17.5" r="2.5" />
+    <path d="M21 17.5V8l-3 1" />
+  </svg>
+)
+
 export const CopyIcon = (p: P) => (
   <svg {...base(p)}>
     <rect x="9" y="9" width="11" height="11" rx="1.5" />

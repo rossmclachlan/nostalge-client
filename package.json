@@ -12,6 +12,7 @@
     "check": "astro check"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@astrojs/react": "^4.2.0",
     "astro": "^5.5.0",
     "clsx": "^2.1.1",

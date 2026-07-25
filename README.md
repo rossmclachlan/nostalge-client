@@ -15,16 +15,46 @@ Built with **Astro** (static output) + **React islands**, **TypeScript**, and
 > For a technical deep-dive (data flow, modules, discovery engine, theming,
 > PWA, deploy), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
-## The four crates
+## The crates
 
 - **Crates** — browse every artist as a card (album art or a generated
   initials placeholder), search client-side, then dig into an artist's sleeves
   and an album's tracklist, plays and "last spun" date.
 - **Discovery** — *Forgotten Gems* (played before, but not in the last 6 months)
   and *Blind Spot* (filed away, never played).
+- **Sets** — describe a playlist in a sentence and get one built out of records you
+  already own. See below.
 - **Tags** — the collection sorted by genre / mood / era, shown as handwritten
   divider cards.
 - **Stats** — big typographic numbers: top artists, top albums, busiest month.
+
+## Sets — playlists in plain language
+
+Type *"something quiet I haven't played in years"* and get a sequenced tracklist with a
+liner note explaining why those records, together, now.
+
+It runs in three stages, and the middle one is ordinary code:
+
+1. **Plan** — Claude turns the sentence into a *query* over the collection (tags, play
+   counts, recency, era).
+2. **Dig** — that query runs locally against the cached library.
+3. **Sequence** — Claude orders the real tracks it was handed and writes the note.
+
+Claude never names a track from memory: it can only choose from what step 2 found, and
+anything else is discarded. **Every track in a playlist is a record you own.**
+
+The taste is built in — sequencing arc, no more than a couple of tracks per artist, deep
+cuts over singles, and a bias toward records that have been sitting on the shelf. You don't
+have to prompt well to get something good.
+
+### Setting it up
+
+Making a playlist calls the Anthropic API, so it needs a key. There is no server here to
+hold one, so the key stays in your own browser (`localStorage`) and goes straight to
+Anthropic. The Sets tab asks for it once. A playlist costs a few cents.
+
+Saved playlists live in `localStorage` and open offline — only *building* one needs the
+network. The rest of the app is unaffected if you never set a key.
 
 ## Data layer
 
@@ -112,9 +142,11 @@ src/
 │   ├── App.tsx        # root island: tabs + navigation stack
 │   ├── crates/        # Crates tab, artist & album detail
 │   ├── discovery/     # Forgotten Gems / Blind Spot
+│   ├── playlists/     # Sets tab: prompt, build panel, playlist detail
 │   ├── tags/          # tag index + tag detail
 │   └── stats/         # listening stats
 ├── lib/               # data layer: pb, cache, useLibrary, derive, format
+│   └── playlist/      # plan -> execute -> curate, and the taste instructions
 ├── layouts/Layout.astro
 ├── pages/index.astro  # mounts the App island
 └── styles/global.css  # zine/record-store design tokens

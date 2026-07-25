@@ -1,11 +1,12 @@
 import { cn } from '@/lib/cn'
-import { ChartIcon, ClockIcon, CompassIcon, CrateIcon, TagIcon } from './icons'
+import { ChartIcon, ClockIcon, CompassIcon, CrateIcon, ListIcon, TagIcon } from './icons'
 
-export type Tab = 'crates' | 'discovery' | 'tags' | 'stats' | 'recent'
+export type Tab = 'crates' | 'discovery' | 'playlists' | 'tags' | 'stats' | 'recent'
 
 const ITEMS: { id: Tab; label: string; Icon: typeof CrateIcon }[] = [
   { id: 'discovery', label: 'Discover', Icon: CompassIcon },
   { id: 'crates', label: 'Crates', Icon: CrateIcon },
+  { id: 'playlists', label: 'Sets', Icon: ListIcon },
   { id: 'tags', label: 'Tags', Icon: TagIcon },
   { id: 'stats', label: 'Stats', Icon: ChartIcon },
   { id: 'recent', label: 'Recent', Icon: ClockIcon },
@@ -23,7 +24,7 @@ export function BottomNav({
       className="fixed inset-x-0 bottom-0 z-30 border-t-[1.5px] border-ink bg-paper-2"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto grid max-w-md grid-cols-5 sm:max-w-xl">
+      <ul className="mx-auto grid max-w-md grid-cols-6 sm:max-w-xl">
         {ITEMS.map(({ id, label, Icon }) => {
           const on = active === id
           return (

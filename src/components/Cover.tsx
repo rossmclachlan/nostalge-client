@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { cn } from '@/lib/cn'
 import { initials, swatchFor } from '@/lib/format'
 
@@ -20,6 +20,12 @@ export function Cover({ name, src, className, shape = 'square' }: CoverProps) {
   const { bg, fg } = swatchFor(name)
   const round = shape === 'circle' ? 'rounded-full' : 'rounded-[2px]'
 
+  // `inline-size` makes this a query container, so the initials placeholder can
+  // be sized against the cover rather than the viewport.
+  const box: CSSProperties = show
+    ? { containerType: 'inline-size' }
+    : { containerType: 'inline-size', backgroundColor: bg }
+
   return (
     <div
       className={cn(
@@ -27,7 +33,7 @@ export function Cover({ name, src, className, shape = 'square' }: CoverProps) {
         round,
         className,
       )}
-      style={show ? undefined : { backgroundColor: bg }}
+      style={box}
     >
       {show ? (
         <img
@@ -39,9 +45,11 @@ export function Cover({ name, src, className, shape = 'square' }: CoverProps) {
         />
       ) : (
         <div className="grid h-full w-full place-items-center p-2">
+          {/* Sized in cqw — scales with the cover, not the viewport, so a
+              thumbnail in a tracklist gets small initials, not clipped ones. */}
           <span
             className="font-display leading-none"
-            style={{ color: fg, fontSize: 'clamp(1.75rem, 11vw, 3.25rem)' }}
+            style={{ color: fg, fontSize: 'clamp(0.7rem, 38cqw, 3.25rem)' }}
           >
             {initials(name)}
           </span>
