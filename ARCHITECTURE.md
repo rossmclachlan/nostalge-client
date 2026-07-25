@@ -166,7 +166,12 @@ on the NAS behind Tailscale), repoint that file and change nothing else.
 ### Cost and caching
 The system prompt (taste + digest) is marked `cache_control: ephemeral` and only changes
 when the library re-syncs, so every later run in a session reads it back at ~0.1×. Stage 1
-runs at `medium` effort, stage 3 at `high`. A playlist costs cents.
+runs at `medium` effort, stage 3 at `high`.
+
+Ballpark per playlist on Opus 5: ~10k input tokens (≈6k planner digest + ~4.5k candidate
+table) and 2–7k output — thinking is on by default and bills as output, so effort is the
+main cost lever, not the prompt size. That lands around 10–20¢. If that matters, `medium`
+on stage 3 is the first dial to turn; `low`/`medium` are unusually strong on this model.
 
 ### Failure
 Every stage returns a `RunFailure` value rather than throwing: `no_key`, `no_data`,

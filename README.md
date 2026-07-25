@@ -51,7 +51,13 @@ have to prompt well to get something good.
 
 Making a playlist calls the Anthropic API, so it needs a key. There is no server here to
 hold one, so the key stays in your own browser (`localStorage`) and goes straight to
-Anthropic. The Sets tab asks for it once. A playlist costs a few cents.
+Anthropic. The Sets tab asks for it once.
+
+The key comes from [console.anthropic.com](https://console.anthropic.com) and is an **API
+key** — billed separately from a Claude.ai subscription, which doesn't grant API access.
+Expect roughly **10–20¢ per playlist** on Opus 5: about 10k input tokens, plus 2–7k output
+(thinking is on by default and counts as output). Repeat runs in the same session are a
+little cheaper, since the collection digest is prompt-cached.
 
 Saved playlists live in `localStorage` and open offline — only *building* one needs the
 network. The rest of the app is unaffected if you never set a key.

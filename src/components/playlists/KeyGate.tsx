@@ -65,7 +65,8 @@ export function KeyGate({ onSaved }: { onSaved: () => void }) {
       </div>
 
       <p className="mt-3 text-xs text-ink-3">
-        Keys come from console.anthropic.com. A playlist costs a few cents.
+        Keys come from console.anthropic.com — an API key, which is billed
+        separately from a Claude subscription. Roughly 10–20¢ per playlist.
       </p>
     </div>
   )
