@@ -55,13 +55,13 @@ src/
 
   components/
     App.tsx                  Root island: tab state, detail navigation stack, discoverySeed, Masthead
-    BottomNav.tsx            Fixed 6-tab bottom nav (Tab type + ITEMS)
+    BottomNav.tsx            Fixed 4-tab bottom nav (Tab type + ITEMS)
     Cover.tsx                Album/artist artwork with generated initials fallback + aged overlay
     ThemeToggle.tsx          Light/dark flip (writes `nostalge:theme`, updates theme-color meta)
     InstallButton.tsx        PWA install button gated on `beforeinstallprompt`
     CopyButton.tsx           Copy-to-clipboard (async API + execCommand fallback)
     DetailHeader.tsx         Sticky back-bar for detail views
-    ui.tsx                   Shared primitives: SectionHeader, Chip, PlayBadge, EmptyState
+    ui.tsx                   Shared primitives: SectionHeader, Chip, PlayBadge, SegmentedControl, EmptyState
     icons.tsx                Inline SVG icon set
     crates/  CratesTab.tsx (album grid + search), AlbumDetail.tsx, ArtistDetail.tsx
     playlists/ PlaylistsTab.tsx (prompt + shelf), RunPanel.tsx (the build, made visible),
@@ -105,7 +105,9 @@ Local cache shapes:
 `nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:gemini-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`).
 
 ## UI / navigation (`src/components/App.tsx`)
-- **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | crates | playlists | tags | stats | recent`. Bottom-nav order: **Discover, Crates, Sets, Tags, Stats, Recent**. Default tab: **discovery**. The grid is `grid-cols-6`.
+- **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | library | playlists | history`. Bottom-nav order: **Discover, Library, Sets, History**. Default tab: **discovery**. The grid is `grid-cols-4`.
+- **The nav is organised by intent, not by data source.** Discover = be told what to play; Library = find something specific; Sets = ask for a playlist in words; History = look back. Crates and Tags are two indexes into the same shelf, so they share the Library tab; Recent and Stats are the same facts at two zoom levels, so they share History. Both pairs are chosen with a `SegmentedControl` at the top of the tab body.
+- **Section state lives in `App`, not in the tab components** (`librarySection`, `historySection`) — same reasoning as `discoverySeed`. A tab body unmounts when a detail is pushed, so state held inside it would be lost: drilling into an album from Tags and pressing Back would silently drop you on Crates. Switching section also scrolls to top, because it is a navigation.
 - **Navigation stack**: `stack: Detail[]`, `Detail = { kind: 'artist'|'album'|'tag'|'playlist'; id }`. When `stack` is non-empty, App renders the matching detail view (in a `max-w-2xl` readable column) instead of the tab body; `back` pops. `changeTab` clears the stack, sets the tab, re-rolls the discovery seed when entering Discovery, scrolls to top.
 - **`discoverySeed`** lives in `App` (not in `DiscoveryTab`) so the Discovery selection **survives drilling into a detail and pressing Back**; it re-rolls only on deliberate tab entry or Shuffle.
 - **Masthead**: "Nostalge" kicker + tab title, a `ConnectionFlag` (syncing / live / "off the shelf" / "no signal"), plus `InstallButton`, `ThemeToggle`, and a spin-while-syncing Refresh button.
@@ -205,7 +207,7 @@ the "never an error state" rule applied to a feature that genuinely depends on a
 - After deploy, the auto-updating SW means clients pick up the new build on next open (no reinstall).
 
 ## Conventions & gotchas for the next contributor
-- **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch, and bump `grid-cols-N` to match. Six is comfortable on a 390px phone; a seventh would need shorter labels.
+- **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch, and bump `grid-cols-N` to match. Four is roomy on a 390px phone. Before adding a fifth, check whether the new view is really a new *intent* or just another view of an existing one — if it's the latter it belongs behind a `SegmentedControl` in the tab that already owns that intent.
 - **Add a discovery card**: write a `CardGenerator` in `cards.ts` returning a `DiscoveryCard | null` and add it to `GENERATORS`. Enforce "enough data" inside the generator and return `null` otherwise.
 - **New PocketBase field**: add it to the interface in `types.ts`, fetch it in `pb.ts` (respect the caps + `requestKey: null`), and it flows through the cache automatically.
 - **Colors**: only touch `@theme` and the `.dark` block; never hardcode hex in components — use token utilities so dark mode keeps working.

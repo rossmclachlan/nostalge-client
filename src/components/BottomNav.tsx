@@ -1,15 +1,24 @@
 import { cn } from '@/lib/cn'
-import { ChartIcon, ClockIcon, CompassIcon, CrateIcon, ListIcon, TagIcon } from './icons'
+import { ClockIcon, CompassIcon, CrateIcon, ListIcon } from './icons'
 
-export type Tab = 'crates' | 'discovery' | 'playlists' | 'tags' | 'stats' | 'recent'
+/**
+ * Four tabs, by intent rather than by data source:
+ *
+ *   Discover — be told what to play (generated cards)
+ *   Library  — find something specific (Crates + Tags, two indexes into one shelf)
+ *   Sets     — ask for a playlist in words
+ *   History  — look back (Recent feed + Stats, the same facts at two zoom levels)
+ *
+ * Crates/Tags and Recent/Stats are chosen with a SegmentedControl inside their
+ * tab; that selection lives in App so it survives drilling into a detail.
+ */
+export type Tab = 'discovery' | 'library' | 'playlists' | 'history'
 
 const ITEMS: { id: Tab; label: string; Icon: typeof CrateIcon }[] = [
   { id: 'discovery', label: 'Discover', Icon: CompassIcon },
-  { id: 'crates', label: 'Crates', Icon: CrateIcon },
+  { id: 'library', label: 'Library', Icon: CrateIcon },
   { id: 'playlists', label: 'Sets', Icon: ListIcon },
-  { id: 'tags', label: 'Tags', Icon: TagIcon },
-  { id: 'stats', label: 'Stats', Icon: ChartIcon },
-  { id: 'recent', label: 'Recent', Icon: ClockIcon },
+  { id: 'history', label: 'History', Icon: ClockIcon },
 ]
 
 export function BottomNav({
@@ -24,7 +33,7 @@ export function BottomNav({
       className="fixed inset-x-0 bottom-0 z-30 border-t-[1.5px] border-ink bg-paper-2"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto grid max-w-md grid-cols-6 sm:max-w-xl">
+      <ul className="mx-auto grid max-w-md grid-cols-4 sm:max-w-xl">
         {ITEMS.map(({ id, label, Icon }) => {
           const on = active === id
           return (

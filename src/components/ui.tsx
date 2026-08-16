@@ -66,6 +66,54 @@ export function PlayBadge({ count, label = 'plays' }: { count: number; label?: s
   )
 }
 
+/**
+ * Switches between the views inside a grouped tab (Crates/Tags, Recent/Stats).
+ *
+ * Deliberately not a third row of navigation: it reads as one pinned label
+ * strip, and the selected half is filled the same way the bottom nav fills its
+ * active tab.
+ */
+export function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  value: T
+  options: { id: T; label: string }[]
+  onChange: (id: T) => void
+  className?: string
+}) {
+  return (
+    <div
+      role="tablist"
+      className={cn(
+        'inline-flex border-[1.5px] border-ink shadow-[2px_2px_0_0_var(--shadow-ink)]',
+        className,
+      )}
+    >
+      {options.map((o, i) => {
+        const on = o.id === value
+        return (
+          <button
+            key={o.id}
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              'label px-3 py-1.5 leading-none transition-colors',
+              i > 0 && 'border-l-[1.5px] border-ink',
+              on ? 'bg-ink text-paper' : 'text-ink-2 active:bg-paper-3',
+            )}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function EmptyState({
   title,
   body,

@@ -15,6 +15,7 @@ import { StatsTab } from './stats/StatsTab'
 import { RecentTab } from './recent/RecentTab'
 import { PlaylistsTab } from './playlists/PlaylistsTab'
 import { PlaylistDetail } from './playlists/PlaylistDetail'
+import { SegmentedControl } from './ui'
 
 type Detail =
   | { kind: 'artist'; id: string }
@@ -23,13 +24,25 @@ type Detail =
   | { kind: 'playlist'; id: string }
 
 const TAB_TITLES: Record<Tab, string> = {
-  crates: 'Crates',
   discovery: 'Discovery',
+  library: 'Library',
   playlists: 'Sets',
-  tags: 'Tags',
-  stats: 'Stats',
-  recent: 'Recent',
+  history: 'History',
 }
+
+/** The two views inside the Library tab. */
+type LibrarySection = 'crates' | 'tags'
+const LIBRARY_SECTIONS: { id: LibrarySection; label: string }[] = [
+  { id: 'crates', label: 'Crates' },
+  { id: 'tags', label: 'Tags' },
+]
+
+/** The two views inside the History tab. */
+type HistorySection = 'recent' | 'stats'
+const HISTORY_SECTIONS: { id: HistorySection; label: string }[] = [
+  { id: 'recent', label: 'Recent' },
+  { id: 'stats', label: 'Stats' },
+]
 
 const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
 
@@ -41,6 +54,10 @@ export default function App() {
   // into a detail and pressing back. It only re-rolls when you deliberately
   // switch to the Discovery tab, or tap "Dig again".
   const [discoverySeed, setDiscoverySeed] = useState(newSeed)
+  // Same reasoning as discoverySeed: kept in App so that drilling into an album
+  // from Tags and pressing Back returns you to Tags, not to Crates.
+  const [librarySection, setLibrarySection] = useState<LibrarySection>('crates')
+  const [historySection, setHistorySection] = useState<HistorySection>('recent')
 
   // Scroll offsets saved per stack depth, so Back returns you to where you
   // were in the list you drilled in from.
@@ -75,6 +92,16 @@ export default function App() {
     setStack([])
     setTab(next)
     if (next === 'discovery') setDiscoverySeed(newSeed())
+    window.scrollTo({ top: 0 })
+  }, [])
+
+  /** Switching section is a navigation too — start the new view at the top. */
+  const changeLibrarySection = useCallback((next: LibrarySection) => {
+    setLibrarySection(next)
+    window.scrollTo({ top: 0 })
+  }, [])
+  const changeHistorySection = useCallback((next: HistorySection) => {
+    setHistorySection(next)
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -129,7 +156,6 @@ export default function App() {
             onRefresh={refresh}
           />
           <main className="pb-safe px-4 pt-4 sm:px-6 lg:px-8">
-            {tab === 'crates' && <CratesTab data={data} onOpenAlbum={openAlbum} />}
             {tab === 'discovery' && (
               <DiscoveryTab
                 data={data}
@@ -138,14 +164,40 @@ export default function App() {
                 onOpenAlbum={openAlbum}
               />
             )}
+
+            {tab === 'library' && (
+              <>
+                <SegmentedControl
+                  value={librarySection}
+                  options={LIBRARY_SECTIONS}
+                  onChange={changeLibrarySection}
+                  className="mb-4"
+                />
+                {librarySection === 'crates' && (
+                  <CratesTab data={data} onOpenAlbum={openAlbum} />
+                )}
+                {librarySection === 'tags' && <TagsTab data={data} onOpenTag={openTag} />}
+              </>
+            )}
+
             {tab === 'playlists' && (
               <PlaylistsTab data={data} onOpenPlaylist={openPlaylist} />
             )}
-            {tab === 'tags' && <TagsTab data={data} onOpenTag={openTag} />}
-            {tab === 'stats' && (
-              <StatsTab data={data} onOpenArtist={openArtist} onOpenAlbum={openAlbum} />
+
+            {tab === 'history' && (
+              <>
+                <SegmentedControl
+                  value={historySection}
+                  options={HISTORY_SECTIONS}
+                  onChange={changeHistorySection}
+                  className="mb-4"
+                />
+                {historySection === 'recent' && <RecentTab />}
+                {historySection === 'stats' && (
+                  <StatsTab data={data} onOpenArtist={openArtist} onOpenAlbum={openAlbum} />
+                )}
+              </>
             )}
-            {tab === 'recent' && <RecentTab />}
           </main>
         </>
       )}

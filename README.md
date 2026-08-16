@@ -15,18 +15,23 @@ Built with **Astro** (static output) + **React islands**, **TypeScript**, and
 > For a technical deep-dive (data flow, modules, discovery engine, theming,
 > PWA, deploy), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
-## The crates
+## The four tabs
 
-- **Crates** — browse every artist as a card (album art or a generated
-  initials placeholder), search client-side, then dig into an artist's sleeves
-  and an album's tracklist, plays and "last spun" date.
-- **Discovery** — *Forgotten Gems* (played before, but not in the last 6 months)
-  and *Blind Spot* (filed away, never played).
-- **Sets** — describe a playlist in a sentence and get one built out of records you
-  already own. See below.
-- **Tags** — the collection sorted by genre / mood / era, shown as handwritten
-  divider cards.
-- **Stats** — big typographic numbers: top artists, top albums, busiest month.
+Organised by what you actually want at the moment you open the app:
+
+- **Discover** — *be told what to play.* Generated cards pulled from your listening
+  history: forgotten gems, long hiatuses, records that first hit the crate in a given
+  year. The artwork is the card; tap a sleeve to open the record.
+- **Library** — *find something specific.* Two indexes into the same shelf:
+  **Crates** (every album as a card, searchable client-side) and **Tags** (the
+  collection sorted by genre / mood / era, as handwritten divider cards).
+- **Sets** — *ask for a playlist in words.* See below.
+- **History** — *look back.* The same facts at two zoom levels: **Recent** (the raw
+  scrobble feed plus sync status) and **Stats** (top artists, top albums, busiest
+  month).
+
+Library and History switch between their two views with a small segmented control at
+the top of the tab.
 
 ## Sets — playlists in plain language
 
