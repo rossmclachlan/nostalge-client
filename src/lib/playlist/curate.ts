@@ -24,7 +24,9 @@ export async function curatePlaylist(
   prompt: string,
   plan: PlaylistPlan,
   candidates: Candidate[],
-): Promise<{ ok: true; playlist: CuratedPlaylist } | { ok: false; failure: RunFailure }> {
+): Promise<
+  { ok: true; playlist: CuratedPlaylist } | { ok: false; failure: RunFailure; detail?: string }
+> {
   if (candidates.length === 0) return { ok: false, failure: 'empty' }
 
   const brief = [

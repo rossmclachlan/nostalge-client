@@ -26,6 +26,18 @@ const FAILURES: Record<RunFailure, { title: string; body: string }> = {
     title: 'Nothing in the crates',
     body: 'No records matched that. Try something broader, or a different corner of the collection.',
   },
+  bad_key: {
+    title: 'Key rejected',
+    body: 'Google turned the key down. Check it was copied whole, that the Generative Language API is enabled on that project, and that the key has no HTTP-referrer restriction blocking this site.',
+  },
+  bad_model: {
+    title: 'No such model',
+    body: 'That model is not available to this key. It may not have rolled out to your account yet.',
+  },
+  rate_limited: {
+    title: 'Too many at once',
+    body: 'The key hit its rate limit. Wait a moment and try again.',
+  },
   unknown: {
     title: 'Could not reach the studio',
     body: 'The request did not get through. Check the key and the connection, then try again.',
@@ -51,6 +63,13 @@ export function RunPanel({ run, onKeyChange }: { run: PlaylistRun; onKeyChange: 
       <div className="flyer aged tilt-r mt-6 p-5">
         <h3 className="stamp-title text-[1.75rem] leading-[0.9]">{title}</h3>
         <p className="mt-2 text-sm text-ink-2">{body}</p>
+        {/* The API's own words. Ugly, but this is a static site with no server
+            logs — without it a failure is undiagnosable from the outside. */}
+        {run.failureDetail && (
+          <p className="mt-3 border-t-[1.5px] border-ink pt-2 font-mono text-[0.7rem] leading-snug text-ink-3">
+            {run.failureDetail}
+          </p>
+        )}
         <button onClick={run.reset} className="btn-press mt-4 px-3 py-1.5 text-sm">
           Try again
         </button>

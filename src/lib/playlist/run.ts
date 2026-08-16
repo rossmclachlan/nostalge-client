@@ -22,6 +22,8 @@ export interface PlaylistRun {
   found: number
   playlist: Playlist | null
   failure: RunFailure | null
+  /** The API's own words, when there are any. */
+  failureDetail: string | null
   saved: Playlist[]
   build: (prompt: string) => void
   reset: () => void
@@ -34,6 +36,7 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
   const [found, setFound] = useState(0)
   const [playlist, setPlaylist] = useState<Playlist | null>(null)
   const [failure, setFailure] = useState<RunFailure | null>(null)
+  const [failureDetail, setFailureDetail] = useState<string | null>(null)
   const [saved, setSaved] = useState<Playlist[]>(() => loadPlaylists())
 
   // Stable between syncs, so it stays the cached prefix across runs.
@@ -46,8 +49,9 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
         return
       }
 
-      const fail = (reason: RunFailure) => {
+      const fail = (reason: RunFailure, detail?: string) => {
         setFailure(reason)
+        setFailureDetail(detail ?? null)
         setStage('failed')
       }
 
@@ -55,6 +59,7 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
         setPlan(null)
         setPlaylist(null)
         setFailure(null)
+        setFailureDetail(null)
         setFound(0)
 
         if (!hasKey()) return fail('no_key')
@@ -62,7 +67,7 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
 
         setStage('planning')
         const planned = await planPlaylist(text, digest)
-        if (!planned.ok) return fail(planned.failure)
+        if (!planned.ok) return fail(planned.failure, planned.detail)
         setPlan(planned.plan)
 
         setStage('digging')
@@ -72,7 +77,7 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
 
         setStage('sequencing')
         const curated = await curatePlaylist(text, planned.plan, candidates)
-        if (!curated.ok) return fail(curated.failure)
+        if (!curated.ok) return fail(curated.failure, curated.detail)
 
         const result: Playlist = {
           id: newPlaylistId(),
@@ -97,6 +102,7 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
     setPlan(null)
     setPlaylist(null)
     setFailure(null)
+    setFailureDetail(null)
     setFound(0)
   }, [])
 
@@ -104,5 +110,5 @@ export function usePlaylistRun(data: MusicData): PlaylistRun {
     setSaved(deletePlaylist(id))
   }, [])
 
-  return { stage, plan, found, playlist, failure, saved, build, reset, remove }
+  return { stage, plan, found, playlist, failure, failureDetail, saved, build, reset, remove }
 }

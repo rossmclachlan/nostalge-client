@@ -8,7 +8,9 @@ import type { PlaylistPlan, RunFailure } from './types'
 export async function planPlaylist(
   prompt: string,
   digest: string,
-): Promise<{ ok: true; plan: PlaylistPlan } | { ok: false; failure: RunFailure }> {
+): Promise<
+  { ok: true; plan: PlaylistPlan } | { ok: false; failure: RunFailure; detail?: string }
+> {
   const result = await callJson({
     system: `${PLANNER_TASTE}\n\n${digest}`,
     prompt: `Build a query for this request:\n\n"${prompt}"`,

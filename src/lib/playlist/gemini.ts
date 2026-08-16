@@ -59,7 +59,29 @@ export function hasKey(): boolean {
   return loadKey() !== ''
 }
 
-export type JsonResult = { ok: true; data: unknown } | { ok: false; failure: RunFailure }
+export type JsonResult =
+  | { ok: true; data: unknown }
+  /** `detail` is the API's own words — shown small under the failure card. */
+  | { ok: false; failure: RunFailure; detail?: string }
+
+/**
+ * Turn whatever the SDK threw into something the listener can act on.
+ *
+ * The SDK's ApiError carries an HTTP status; anything else (a TypeError from a
+ * blocked fetch, a JSON parse failure) falls through as unknown.
+ */
+function classify(err: unknown): { failure: RunFailure; detail?: string } {
+  const status = typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined
+  const message = err instanceof Error ? err.message : String(err)
+
+  // 400 covers both a malformed request and an invalid key; the message is the
+  // only way to tell, and getting the key wrong is far more likely here.
+  if (status === 400 && /api[ _]?key/i.test(message)) return { failure: 'bad_key', detail: message }
+  if (status === 401 || status === 403) return { failure: 'bad_key', detail: message }
+  if (status === 404) return { failure: 'bad_model', detail: message }
+  if (status === 429) return { failure: 'rate_limited', detail: message }
+  return { failure: 'unknown', detail: message }
+}
 
 /** How hard to let the model think. Maps to Gemini's thinking levels. */
 export type Effort = 'minimal' | 'low' | 'medium' | 'high'
@@ -139,9 +161,11 @@ export async function callJson({
     }
 
     return { ok: true, data: JSON.parse(text) as unknown }
-  } catch {
-    // Bad key, rate limit, dropped connection, malformed JSON — all the same
-    // to the listener, and none of them should surface as a stack trace.
-    return { ok: false, failure: 'unknown' }
+  } catch (err) {
+    // Never rethrow — but never swallow silently either. The console line is
+    // unconditional: this runs in a deployed static site with no server logs,
+    // so it is the only way to see what actually happened.
+    console.error('[playlist] request failed', err)
+    return { ok: false, ...classify(err) }
   }
 }

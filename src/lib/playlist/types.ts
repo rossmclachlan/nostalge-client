@@ -131,5 +131,20 @@ export interface Playlist {
 
 export type RunStage = 'idle' | 'planning' | 'digging' | 'sequencing' | 'done' | 'failed'
 
-/** Why a run stopped. Never surfaced as a thrown error. */
-export type RunFailure = 'no_key' | 'no_data' | 'offline' | 'refused' | 'empty' | 'unknown'
+/**
+ * Why a run stopped. Never surfaced as a thrown error.
+ *
+ * These are deliberately specific: "something went wrong" is useless when the
+ * API is a black box behind someone else's key, so the common, actionable
+ * causes get their own value and their own copy.
+ */
+export type RunFailure =
+  | 'no_key'
+  | 'no_data'
+  | 'offline'
+  | 'refused'
+  | 'empty'
+  | 'bad_key'
+  | 'bad_model'
+  | 'rate_limited'
+  | 'unknown'
