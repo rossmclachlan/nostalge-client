@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { hasKey } from '@/lib/playlist/claude'
+import { hasKey } from '@/lib/playlist/gemini'
 import { usePlaylistRun } from '@/lib/playlist/run'
 import type { MusicData } from '@/lib/types'
 import { relativeAge } from '@/lib/format'

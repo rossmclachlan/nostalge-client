@@ -53,10 +53,10 @@ export default defineConfig({
         clientsClaim: true,
         // Precache the app shell so it launches offline.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,webmanifest}'],
-        // ...but not the Anthropic SDK. It's a big chunk that only the playlist
+        // ...but not the model SDK. It's a big chunk that only the playlist
         // builder loads, and that feature needs the network regardless — there
         // is nothing to gain from shipping it to every install.
-        globIgnores: ['**/anthropic*.js'],
+        globIgnores: ['**/genai*.js'],
         // Keep album / artist art around once seen, even off-network.
         runtimeCaching: [
           {
@@ -84,7 +84,7 @@ export default defineConfig({
           // Give the SDK a stable chunk name so the service worker can skip it
           // (see workbox globIgnores above).
           manualChunks(id) {
-            if (id.includes('@anthropic-ai/sdk')) return 'anthropic'
+            if (id.includes('@google/genai')) return 'genai'
           },
         },
       },

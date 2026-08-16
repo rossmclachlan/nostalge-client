@@ -35,12 +35,12 @@ liner note explaining why those records, together, now.
 
 It runs in three stages, and the middle one is ordinary code:
 
-1. **Plan** — Claude turns the sentence into a *query* over the collection (tags, play
+1. **Plan** — the model turns the sentence into a *query* over the collection (tags, play
    counts, recency, era).
 2. **Dig** — that query runs locally against the cached library.
-3. **Sequence** — Claude orders the real tracks it was handed and writes the note.
+3. **Sequence** — the model orders the real tracks it was handed and writes the note.
 
-Claude never names a track from memory: it can only choose from what step 2 found, and
+The model never names a track from memory: it can only choose from what step 2 found, and
 anything else is discarded. **Every track in a playlist is a record you own.**
 
 The taste is built in — sequencing arc, no more than a couple of tracks per artist, deep
@@ -49,15 +49,15 @@ have to prompt well to get something good.
 
 ### Setting it up
 
-Making a playlist calls the Anthropic API, so it needs a key. There is no server here to
+Making a playlist calls the Gemini API, so it needs a key. There is no server here to
 hold one, so the key stays in your own browser (`localStorage`) and goes straight to
-Anthropic. The Sets tab asks for it once.
+Google. The Sets tab asks for it once.
 
-The key comes from [console.anthropic.com](https://console.anthropic.com) and is an **API
-key** — billed separately from a Claude.ai subscription, which doesn't grant API access.
-Expect roughly **10–20¢ per playlist** on Opus 5: about 10k input tokens, plus 2–7k output
-(thinking is on by default and counts as output). Repeat runs in the same session are a
-little cheaper, since the collection digest is prompt-cached.
+The key comes from [aistudio.google.com](https://aistudio.google.com/apikey) and is an
+**API key** — billed separately from any Gemini subscription, which doesn't grant API
+access. Expect roughly **2¢ per playlist** on `gemini-3.7-flash`: about 10k input tokens
+plus 2–7k output, at its introductory $0.75/$3.75 per million (rising to $1.50/$7.50 on
+1 January 2027).
 
 Saved playlists live in `localStorage` and open offline — only *building* one needs the
 network. The rest of the app is unaffected if you never set a key.

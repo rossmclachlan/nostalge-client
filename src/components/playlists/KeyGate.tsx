@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { clearKey, hasKey, saveKey } from '@/lib/playlist/claude'
+import { clearKey, hasKey, saveKey } from '@/lib/playlist/gemini'
 
 /**
  * Key entry. The client is a static site with no server to hold a secret, so
  * the listener's own key lives in their own browser's localStorage and goes
- * straight to the Anthropic API.
+ * straight to the Gemini API.
  */
 export function KeyGate({ onSaved }: { onSaved: () => void }) {
   const [value, setValue] = useState('')
@@ -26,12 +26,12 @@ export function KeyGate({ onSaved }: { onSaved: () => void }) {
     <div className="flyer aged tilt-l mx-auto mt-8 max-w-sm p-5">
       <p className="label text-riso-red mb-1">One-time setup</p>
       <h3 className="stamp-title text-[2rem] leading-[0.85]">
-        {stored ? 'Change the key' : 'An Anthropic key'}
+        {stored ? 'Change the key' : 'A Gemini key'}
       </h3>
       <p className="mt-2 text-sm text-ink-2">
-        Playlist-making runs against the Anthropic API. There is no server here to
+        Playlist-making runs against the Gemini API. There is no server here to
         hold a key, so yours is kept in this browser only and sent straight to
-        Anthropic — never anywhere else.
+        Google — never anywhere else.
       </p>
 
       <label className="label mt-4 block text-ink-3" htmlFor="anthropic-key">
@@ -45,7 +45,7 @@ export function KeyGate({ onSaved }: { onSaved: () => void }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && save()}
-        placeholder="sk-ant-…"
+        placeholder="AIza…"
         className="mt-1 w-full border-[1.5px] border-ink bg-paper px-2 py-1.5 text-sm text-ink placeholder:text-ink-3 focus:outline-none"
       />
 
@@ -65,8 +65,8 @@ export function KeyGate({ onSaved }: { onSaved: () => void }) {
       </div>
 
       <p className="mt-3 text-xs text-ink-3">
-        Keys come from console.anthropic.com — an API key, which is billed
-        separately from a Claude subscription. Roughly 10–20¢ per playlist.
+        Keys come from aistudio.google.com — an API key, billed separately from
+        any Gemini subscription. Around 2¢ per playlist.
       </p>
     </div>
   )

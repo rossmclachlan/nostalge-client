@@ -1,4 +1,4 @@
-import { callJson } from './claude'
+import { callJson } from './gemini'
 import { normalisePlan } from './normalise'
 import { PLAN_SCHEMA } from './schema'
 import { PLANNER_TASTE } from './taste'
@@ -15,7 +15,7 @@ export async function planPlaylist(
     schema: PLAN_SCHEMA,
     // Small, bounded output and the listener is waiting — this does not need
     // deep deliberation, and the curator does the taste work.
-    effort: 'medium',
+    effort: 'low',
   })
 
   if (!result.ok) return result

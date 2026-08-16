@@ -10,7 +10,7 @@ Live: `https://rossmclachlan.github.io/nostalge-client/`
 - **TypeScript** (strict), path alias `@/* → src/*`.
 - **Tailwind CSS v4** via `@tailwindcss/vite` (no `tailwind.config.js`; design tokens live in CSS `@theme`).
 - **PocketBase JS SDK** `0.21.5` (pinned).
-- **@anthropic-ai/sdk** — playlist builder only, **dynamically imported** so it stays
+- **@google/genai** — playlist builder only, **dynamically imported** so it stays
   out of the app shell (see Playlist builder below).
 - **@vite-pwa/astro** (Workbox) for the installable PWA + offline app shell.
 - No test suite, no linter config, no `tailwind.config.js`, no `CLAUDE.md`.
@@ -45,7 +45,7 @@ src/
       types.ts               PlaylistPlan, Candidate, Playlist, RunStage, RunFailure
       schema.ts              JSON Schemas for the two structured-output calls
       normalise.ts           Coerce/clamp model output into trustworthy shapes
-      claude.ts              Key storage, lazy SDK import, the single API call. Never throws.
+      gemini.ts              Key storage, lazy SDK import, the single API call. Never throws.
       digest.ts              Compact collection portrait for the planner (the cached prefix)
       plan.ts                Stage 1 — prompt -> PlaylistPlan
       execute.ts             Stage 2 — PlaylistPlan + MusicData -> Candidate[]. PURE, no network.
@@ -55,7 +55,7 @@ src/
 
   components/
     App.tsx                  Root island: tab state, detail navigation stack, discoverySeed, Masthead
-    BottomNav.tsx            Fixed 5-tab bottom nav (Tab type + ITEMS)
+    BottomNav.tsx            Fixed 6-tab bottom nav (Tab type + ITEMS)
     Cover.tsx                Album/artist artwork with generated initials fallback + aged overlay
     ThemeToggle.tsx          Light/dark flip (writes `nostalge:theme`, updates theme-color meta)
     InstallButton.tsx        PWA install button gated on `beforeinstallprompt`
@@ -102,7 +102,7 @@ Local cache shapes:
 - **`useRecentPlays()`** — same pattern with its own cache key; also manual-refresh only.
 
 ### localStorage keys
-`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:anthropic-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`).
+`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:gemini-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`).
 
 ## UI / navigation (`src/components/App.tsx`)
 - **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | crates | playlists | tags | stats | recent`. Bottom-nav order: **Discover, Crates, Sets, Tags, Stats, Recent**. Default tab: **discovery**. The grid is `grid-cols-6`.
@@ -117,7 +117,8 @@ The Discovery tab is a **data engine kept separate from the UI**.
 - `cards.ts` — `GENERATORS`, **32 total: 22 active, 10 dormant** (`() => null`). A generator returns a `DiscoveryCard` (headline, subheadline, optional big `metric`, 1–6 albums, CTA, `narrativeScore`), an array of cards (the tag/year families emit several per deal), or `null` to be skipped.
   - **Active** (from cached albums/artists/plays): On This Day, This Month That Year, Late Night, Morning Stack, Weekend, Sunday, Almost There, Century Club, First Listen Flashback, Forgotten Gems, Long Hiatus, One Summer, Fading Favourites, Fast Burner (plays/yr — *ownership proxied by first cached play*), The B-Side, The Grower, plus the non-recency families: Genre Spotlight (×3, rotating tag), Lucky Dip (×2, random pull from a rotating tag crate), Blind Pull (6 random sleeves), Class of YYYY (×2, year of first cached play), Pressed in YYYY (×2, Last.fm year tags as release years), The Underplayed, The Completist.
   - **Dormant** (wired in, always `null` until backend data exists): One Hit Wonders, Deep Cut Ratio, Never Finished, All Killer (need **per-track plays** — tracks aren't cached); From Somewhere New (no **artist country**); Decade Deep Dive (no **release year**); Short and Sweet, Commitment Test (no cached **album duration**); Loved But Unplayed, Sleeper Loved (no **"loved"** field).
-- `DiscoveryTab.tsx` — runs the engine via `useMemo([data, seed])`, renders up to 5 `DiscoveryCard`s, Shuffle button (`onReroll` re-seeds), and a "come back soon" empty state when `< 3` cards have data.
+- `DiscoveryTab.tsx` — runs the engine via `useMemo([data, seed])`, renders the selected `DiscoveryCard`s, Shuffle button (`onReroll` re-seeds), and a "come back soon" empty state when `< 3` cards have data.
+- `DiscoveryCard.tsx` — **the artwork is the card.** One album gets a large hero sleeve; several become a horizontal snap-scrolling strip that bleeds to the card edges so the next sleeve peeks in (that peek is the scroll affordance). The strip needs `scroll-pl-4` as well as `px-4`: without it the snapport starts at the padding edge and the first sleeve snaps flush to the card border instead of aligning with the headline. The category label and the metric sticker share one line, because the sticker used to be a block of its own and cost the artwork a chunk of height. There is **no CTA button** — the sleeves are the affordance — and the `cta` field has been removed from the card model accordingly.
 
 > **Highest-value data-layer extension:** caching track-level plays would unlock the 4 per-track cards without any backend schema change. Country/year/duration/loved need new backend fields.
 
@@ -128,7 +129,7 @@ tracklist drawn from the collection. It runs in **three stages with a determinis
 middle**:
 
 ```
-prompt ─▶ [Claude: PLAN] ─▶ PlaylistPlan ─▶ [execute.ts] ─▶ Candidate[] ─▶ [Claude: CURATE] ─▶ Playlist
+prompt ─▶ [model: PLAN] ─▶ PlaylistPlan ─▶ [execute.ts] ─▶ Candidate[] ─▶ [model: CURATE] ─▶ Playlist
 ```
 
 **The model never names a track from memory.** Stage 1 emits a *query*; `execute.ts`
@@ -141,7 +142,7 @@ every playlist provably exists in the collection. The plan's `max_per_artist` /
   arguments). It reuses `buildContext()` from the discovery engine, so the collection-wide
   exclusions apply for free. It is the half worth testing, and it needs no API key.
 - **It runs off the cache.** `MusicData.tracks` already carries per-track play counts, so
-  building needs no PocketBase call — only api.anthropic.com. Saved playlists open fully
+  building needs no PocketBase call — only generativelanguage.googleapis.com. Saved playlists open fully
   offline.
 - **Candidate selection is round-robin by album**, so one record can't eat an artist's
   whole allowance and the curator keeps a real choice of *which* track from a record.
@@ -157,21 +158,23 @@ every playlist provably exists in the collection. The plan's `max_per_artist` /
 
 ### The API key
 There is no server, so the key is the user's own, in their own browser
-(`nostalge:anthropic-key:v1`), sent straight to Anthropic. `claude.ts` sets
-`dangerouslyAllowBrowser: true` — required, and what makes the SDK send the
-`anthropic-dangerous-direct-browser-access` header that unlocks CORS. **`claude.ts` is the
-only file that talks to the API**: to move the key server-side later (a Worker, or a route
-on the NAS behind Tailscale), repoint that file and change nothing else.
+(`nostalge:gemini-key:v1`), sent straight to Google. The `@google/genai` SDK ships a
+browser build via its `browser` export condition, so no opt-in flag is needed and the
+node-only dependencies (google-auth-library, protobufjs) never reach the bundle.
+**`gemini.ts` is the only file that talks to the API**: to move the key server-side later
+(a Worker, or a route on the NAS behind Tailscale), repoint that file and change nothing
+else. A stale `nostalge:anthropic-key:v1` from the previous provider is deleted on load.
 
 ### Cost and caching
 The system prompt (taste + digest) is marked `cache_control: ephemeral` and only changes
 when the library re-syncs, so every later run in a session reads it back at ~0.1×. Stage 1
 runs at `medium` effort, stage 3 at `high`.
 
-Ballpark per playlist on Opus 5: ~10k input tokens (≈6k planner digest + ~4.5k candidate
-table) and 2–7k output — thinking is on by default and bills as output, so effort is the
-main cost lever, not the prompt size. That lands around 10–20¢. If that matters, `medium`
-on stage 3 is the first dial to turn; `low`/`medium` are unusually strong on this model.
+Ballpark per playlist on `gemini-3.7-flash`: ~10k input tokens (≈6k planner digest + ~4.5k
+candidate table) and 2–7k output. Thinking bills as output, so the thinking level is the
+main cost lever, not the prompt size. At the introductory $0.75/$3.75 per million that is
+around 2¢; standard pricing from 1 Jan 2027 doubles it. Stage 1 runs at `low` thinking,
+stage 3 at `medium` — raise stage 3 to `high` if sequencing feels flat.
 
 ### Failure
 Every stage returns a `RunFailure` value rather than throwing: `no_key`, `no_data`,
@@ -187,11 +190,11 @@ the "never an error state" rule applied to a feature that genuinely depends on a
 ## PWA / service worker
 - `@vite-pwa/astro` with `registerType: 'autoUpdate'`, `injectRegister: false`. Because vite-plugin-pwa's HTML injection doesn't run on Astro's generated pages, the **manifest link and SW registration are hand-wired in `Layout.astro`** (base-path aware).
 - Workbox: `skipWaiting: true` + `clientsClaim: true` (new SW takes over open pages immediately), app-shell precache, and a `cover-art` CacheFirst runtime cache for images.
-- **The Anthropic SDK is deliberately not precached.** A `manualChunks` rule in
-  `astro.config.mjs` gives it a stable `anthropic.*.js` name and `globIgnores` keeps it out
-  of the precache manifest — it is ~170 kB that only the Sets tab loads, and that feature
-  needs the network anyway. Precache stays at ~385 KiB. If you rename that chunk, update the
-  `globIgnores` pattern with it.
+- **The model SDK is deliberately not precached.** A `manualChunks` rule in
+  `astro.config.mjs` gives it a stable `genai.*.js` name and `globIgnores` keeps it out of
+  the precache manifest — it is ~390 kB (70 kB gzipped) that only the Sets tab loads, and
+  that feature needs the network anyway. Precache stays at ~385 KiB. If you rename that
+  chunk, update the `globIgnores` pattern with it.
 - Registration script tracks `hadController` (so a fresh install doesn't reload), reloads once on `controllerchange` (new build activates without a manual hard refresh), and calls `reg.update()` on `visibilitychange`.
 - Manifest `scope`/`start_url`/`id` all pinned to `/nostalge-client/`.
 

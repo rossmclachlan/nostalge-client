@@ -108,7 +108,6 @@ const onThisDay: CardGenerator = (ctx) => {
     subheadline: `What you had on rotation this date in years gone by.`,
     metric: { value: String(yearsAgo), label: yearsAgo === 1 ? 'year ago' : 'years ago' },
     albums: hits.slice(0, 6).map((h) => ctx.toCardAlbum(h.album)),
-    cta: 'Put it on again',
     narrativeScore: 0.95,
   }
 }
@@ -140,7 +139,6 @@ const thisMonthThatYear: CardGenerator = (ctx) => {
     subheadline: `${MONTHS[m]} used to sound like this.`,
     metric: { value: String(best.count), label: `plays · ${MONTHS[m]} ${best.year}` },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -159,7 +157,6 @@ const lateNight: CardGenerator = (ctx) => {
     subheadline: `A record that only ever comes out after midnight.`,
     metric: { value: `${pct(best.value)}%`, label: 'plays after midnight' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.8,
   }
 }
@@ -178,7 +175,6 @@ const morningStack: CardGenerator = (ctx) => {
     subheadline: `The one you reach for before the day starts.`,
     metric: { value: `${pct(best.value)}%`, label: 'plays before 9am' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -197,7 +193,6 @@ const weekendAlbums: CardGenerator = (ctx) => {
     subheadline: `Strictly a Saturday-and-Sunday kind of record.`,
     metric: { value: `${pct(best.value)}%`, label: 'plays at the weekend' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.6,
   }
 }
@@ -216,7 +211,6 @@ const sundayAlbums: CardGenerator = (ctx) => {
     subheadline: `Something about this one says slow Sunday.`,
     metric: { value: `${pct(best.value)}%`, label: 'plays on a Sunday' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.6,
   }
 }
@@ -246,7 +240,6 @@ const almostThere: CardGenerator = (ctx) => {
     subheadline: `A handful of spins away from a milestone.`,
     metric: { value: String(best.gap), label: `plays from ${best.target}` },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Close the gap',
     narrativeScore: 0.85,
   }
 }
@@ -266,7 +259,6 @@ const centuryClub: CardGenerator = (ctx) => {
     subheadline: `Just tipped past a hundred plays — and still going.`,
     metric: { value: String(best.album.play_count), label: 'plays and counting' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.65,
   }
 }
@@ -288,7 +280,6 @@ const firstListenFlashback: CardGenerator = (ctx) => {
     subheadline: `You first pressed play on this a long time ago.`,
     metric: { value: String(year), label: `${years} years back` },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -318,7 +309,6 @@ const oneHitWonders: CardGenerator = (ctx) => {
     subheadline: `You mostly come for one track — “${best.hit}”. The rest is waiting.`,
     metric: { value: `${pct(best.share)}%`, label: 'of the album’s plays' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Hear the rest',
     narrativeScore: 0.75,
   }
 }
@@ -350,7 +340,6 @@ const deepCutRatio: CardGenerator = (ctx) => {
     subheadline: `You play this one front to back — every track pulls its weight.`,
     metric: { value: String(best.tracks), label: 'tracks, none skipped' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -379,7 +368,6 @@ const forgottenGems: CardGenerator = (ctx) => {
     subheadline: `You wore these out once. They've been quiet a long while.`,
     metric: { value: String(months), label: 'months untouched' },
     albums: candidates.slice(0, 6).map((c) => ctx.toCardAlbum(c.album)),
-    cta: 'Hear the rest',
     narrativeScore: 0.9,
   }
 }
@@ -405,7 +393,6 @@ const longHiatus: CardGenerator = (ctx) => {
     subheadline: `You came back to this one after the longest silence.`,
     metric: { value: best.gap.toLocaleString(), label: 'days between plays' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.75,
   }
 }
@@ -426,7 +413,6 @@ const oneSummer: CardGenerator = (ctx) => {
     subheadline: `A short, intense run — and then never again.`,
     metric: { value: String(year), label: 'and never since' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Relive it',
     narrativeScore: 0.8,
   }
 }
@@ -458,7 +444,6 @@ const fadingFavourites: CardGenerator = (ctx) => {
     subheadline: `Top of the pile two years ago. Barely a spin lately.`,
     metric: { value: `${best.then}→${best.recent}`, label: 'plays, then vs now' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it back on',
     narrativeScore: 0.75,
   }
 }
@@ -506,7 +491,6 @@ const allKiller: CardGenerator = (ctx) => {
     subheadline: `Every single track on this has earned a spin.`,
     metric: { value: String(count), label: 'tracks, all played' },
     albums: [ctx.toCardAlbum(pick)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -540,7 +524,6 @@ const playsPerYear: CardGenerator = (ctx) => {
     subheadline: `Newer to the shelf, but you can't stop reaching for it.`,
     metric: { value: String(rate), label: 'plays per year owned' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.6,
   }
 }
@@ -577,7 +560,6 @@ const theBSide: CardGenerator = (ctx) => {
     headline: 'The B-Side',
     subheadline: `Your favourite artists' most-overlooked records.`,
     albums: bsides.slice(0, 6).map((a) => ctx.toCardAlbum(a)),
-    cta: 'Hear the rest',
     narrativeScore: 0.7,
   }
 }
@@ -605,7 +587,6 @@ const theGrower: CardGenerator = (ctx) => {
     subheadline: `Didn't grab you at first. Now you can't leave it alone.`,
     metric: { value: `${best.value.toFixed(1)}×`, label: 'more plays lately' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -629,7 +610,6 @@ const genreSpotlight: CardGenerator = (ctx) => {
     subheadline: `A wander through the ${tag} shelves.`,
     metric: { value: String(list.length), label: 'records in the crate' },
     albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
-    cta: 'Dig in',
     narrativeScore: 0.55,
   }))
 }
@@ -653,7 +633,6 @@ const luckyDip: CardGenerator = (ctx) => {
           ? { value: String(album.play_count), label: 'plays so far' }
           : undefined,
       albums: [ctx.toCardAlbum(album)],
-      cta: 'Put it on',
       narrativeScore: 0.5,
     }
   })
@@ -669,7 +648,6 @@ const blindPull: CardGenerator = (ctx) => {
     headline: 'Blind Pull',
     subheadline: `Six sleeves grabbed at random. No agenda.`,
     albums: picks.map(ctx.toCardAlbum),
-    cta: 'Take a chance',
     narrativeScore: 0.45,
   }
 }
@@ -701,7 +679,6 @@ const classOf: CardGenerator = (ctx) => {
     subheadline: `Records that first hit the crate that year.`,
     metric: { value: String(list.length), label: 'new arrivals' },
     albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
-    cta: 'Revisit the intake',
     narrativeScore: 0.6,
   }))
 }
@@ -720,7 +697,6 @@ const pressedIn: CardGenerator = (ctx) => {
     subheadline: `Records from the year ${year} shelf.`,
     metric: { value: String(list.length), label: 'in the crate' },
     albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
-    cta: 'Spin the year',
     narrativeScore: 0.6,
   }))
 }
@@ -738,7 +714,6 @@ const theUnderplayed: CardGenerator = (ctx) => {
     headline: 'The Underplayed',
     subheadline: `In the crate, barely cracked. Fewer than a handful of spins each.`,
     albums: picks.map(ctx.toCardAlbum),
-    cta: 'Give one a shot',
     narrativeScore: 0.55,
   }
 }
@@ -766,7 +741,6 @@ const theCompletist: CardGenerator = (ctx) => {
     subheadline: `You keep coming back for ${name}.`,
     metric: { value: String(list.length), label: 'records in the crate' },
     albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
-    cta: 'Line them up',
     narrativeScore: 0.6,
   }
 }
@@ -835,7 +809,6 @@ const neighbours: CardGenerator = (ctx) => {
     headline: 'Neighbours',
     subheadline: `Filed near ${anchor.name} — kindred artists already in your crate.`,
     albums: [...albums].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
-    cta: 'Follow the thread',
     narrativeScore: 0.6,
   }
 }
@@ -862,7 +835,6 @@ const nobodyElseListens: CardGenerator = (ctx) => {
       label: 'listeners worldwide',
     },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -895,7 +867,6 @@ const rareGroove: CardGenerator = (ctx) => {
         : `One of just ${list.length} ${tag} records you own.`,
     metric: { value: String(list.length), label: `tagged ${tag}` },
     albums: [...list].sort(byPlays).slice(0, 6).map(ctx.toCardAlbum),
-    cta: 'Put it on',
     narrativeScore: 0.55,
   }))
 }
@@ -911,7 +882,6 @@ const sleeveNotes: CardGenerator = (ctx) => {
     headline: 'Sleeve Notes',
     subheadline: `“${plainText(album.wiki_summary, 180)}”`,
     albums: [ctx.toCardAlbum(album)],
-    cta: 'Put it on',
     narrativeScore: 0.5,
   }
 }
@@ -943,7 +913,6 @@ const dailyDriver: CardGenerator = (ctx) => {
     subheadline: `There was a stretch where this went on every single day.`,
     metric: { value: String(best.streak), label: 'days in a row' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -969,7 +938,6 @@ const seasonal: CardGenerator = (ctx) => {
     subheadline: `Something about this one only really lands in ${MONTHS[best.month]}.`,
     metric: { value: `${pct(best.frac)}%`, label: `of plays in ${MONTHS[best.month]}` },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.65,
   }
 }
@@ -1015,7 +983,6 @@ const inOneSitting: CardGenerator = (ctx) => {
     subheadline: `One day you just kept flipping it back to side A.`,
     metric: { value: String(best.count), label: 'plays in a single day' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.7,
   }
 }
@@ -1051,7 +1018,6 @@ const lostWeekend: CardGenerator = (ctx) => {
     subheadline: `This soundtracked one whole Saturday and Sunday.`,
     metric: { value: String(best.count), label: 'plays in one weekend' },
     albums: [ctx.toCardAlbum(best.album)],
-    cta: 'Put it on',
     narrativeScore: 0.65,
   }
 }
@@ -1077,7 +1043,6 @@ const moreLikeThis: CardGenerator = (ctx) => {
     headline: 'More Like This',
     subheadline: `Cut from the same cloth as ${anchor.title}.`,
     albums: scored.slice(0, 6).map((x) => ctx.toCardAlbum(x.a)),
-    cta: 'Follow the thread',
     narrativeScore: 0.6,
   }
 }
@@ -1108,7 +1073,6 @@ const shelfYouForgot: CardGenerator = (ctx) => {
       .sort((a, b) => (a.play_count || 0) - (b.play_count || 0))
       .slice(0, 6)
       .map(ctx.toCardAlbum),
-    cta: 'Dig in',
     narrativeScore: 0.6,
   }
 }
@@ -1124,7 +1088,6 @@ const judgeTheCover: CardGenerator = (ctx) => {
     headline: 'Judge the Cover',
     subheadline: `You've barely played it — but look at that sleeve.`,
     albums: [ctx.toCardAlbum(pick)],
-    cta: 'Put it on',
     narrativeScore: 0.5,
   }
 }

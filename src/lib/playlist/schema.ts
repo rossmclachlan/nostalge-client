@@ -1,13 +1,15 @@
-import type { JSONOutputFormat } from '@anthropic-ai/sdk/resources/messages'
-
 /**
  * JSON Schemas for the two structured-output calls.
  *
- * Structured outputs are strict about shape: every object needs
- * `additionalProperties: false` and a `required` array listing every property.
- * Numeric and string *constraints* (minimum, maxLength, …) are not supported —
- * ranges are documented in the descriptions and clamped in `normalise.ts`.
+ * These go to Gemini's `responseJsonSchema`, which accepts standard JSON Schema
+ * but supports only a subset of keywords — `type`, `enum`, `items`,
+ * `properties`, `required`, `additionalProperties`, `description` and a few
+ * others. Everything here stays inside that subset. Ranges are documented in
+ * the descriptions and clamped in `normalise.ts` rather than expressed as
+ * `minimum`/`maximum`, so the same schemas would port to another provider.
  */
+
+type JsonSchema = Record<string, unknown>
 
 const stringArray = (description: string) => ({
   type: 'array' as const,
@@ -15,7 +17,7 @@ const stringArray = (description: string) => ({
   description,
 })
 
-export const PLAN_SCHEMA: JSONOutputFormat['schema'] = {
+export const PLAN_SCHEMA: JsonSchema = {
   type: 'object',
   additionalProperties: false,
   required: [
@@ -142,7 +144,7 @@ export const PLAN_SCHEMA: JSONOutputFormat['schema'] = {
   },
 }
 
-export const PLAYLIST_SCHEMA: JSONOutputFormat['schema'] = {
+export const PLAYLIST_SCHEMA: JsonSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['title', 'liner_note', 'tracks'],

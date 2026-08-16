@@ -29,7 +29,6 @@ export interface DiscoveryCard {
   subheadline: string
   metric?: { value: string; label: string }
   albums: CardAlbum[]
-  cta: string
   /** 0..1 — how strong the narrative hook is; steers selection weight */
   narrativeScore: number
 }

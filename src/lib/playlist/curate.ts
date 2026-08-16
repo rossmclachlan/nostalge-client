@@ -1,4 +1,4 @@
-import { callJson } from './claude'
+import { callJson } from './gemini'
 import { candidateLines } from './execute'
 import { normaliseCurated } from './normalise'
 import { PLAYLIST_SCHEMA } from './schema'
@@ -49,7 +49,7 @@ export async function curatePlaylist(
     prompt: brief,
     schema: PLAYLIST_SCHEMA,
     // The taste work. Worth the extra deliberation.
-    effort: 'high',
+    effort: 'medium',
   })
 
   if (!result.ok) return result

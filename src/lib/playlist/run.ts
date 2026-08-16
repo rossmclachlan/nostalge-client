@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { hasData } from '../cache'
 import type { MusicData } from '../types'
-import { hasKey } from './claude'
+import { hasKey } from './gemini'
 import { curatePlaylist } from './curate'
 import { buildDigest } from './digest'
 import { executePlan } from './execute'
