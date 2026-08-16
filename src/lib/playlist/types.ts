@@ -147,4 +147,6 @@ export type RunFailure =
   | 'bad_key'
   | 'bad_model'
   | 'rate_limited'
+  /** The model is overloaded — their side, not yours. Retried before surfacing. */
+  | 'busy'
   | 'unknown'

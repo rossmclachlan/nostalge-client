@@ -38,6 +38,10 @@ const FAILURES: Record<RunFailure, { title: string; body: string }> = {
     title: 'Too many at once',
     body: 'The key hit its rate limit. Wait a moment and try again.',
   },
+  busy: {
+    title: 'The studio is packed',
+    body: "The model is under load at Google's end — nothing wrong with your key or your connection. It was already retried a couple of times; give it a minute and go again.",
+  },
   unknown: {
     title: 'Could not reach the studio',
     body: 'The request did not get through. Check the key and the connection, then try again.',

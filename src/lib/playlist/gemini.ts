@@ -70,8 +70,22 @@ export type JsonResult =
  * The SDK's ApiError carries an HTTP status; anything else (a TypeError from a
  * blocked fetch, a JSON parse failure) falls through as unknown.
  */
+/**
+ * Statuses worth trying again. A busy model is the common one: `gemini-3.7-flash`
+ * is new enough to hit capacity limits, and a run makes two calls — losing the
+ * planning and the dig to a blip that would clear in a second is a bad trade.
+ *
+ * 429 is deliberately *not* here. A rate limit means slow down, and retrying
+ * into it makes things worse; that one surfaces immediately.
+ */
+const RETRYABLE = new Set([500, 502, 503, 504])
+const MAX_ATTEMPTS = 3
+
+const statusOf = (err: unknown): number | undefined =>
+  typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined
+
 function classify(err: unknown): { failure: RunFailure; detail?: string } {
-  const status = typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined
+  const status = statusOf(err)
   const message = err instanceof Error ? err.message : String(err)
 
   // 400 covers both a malformed request and an invalid key; the message is the
@@ -80,8 +94,11 @@ function classify(err: unknown): { failure: RunFailure; detail?: string } {
   if (status === 401 || status === 403) return { failure: 'bad_key', detail: message }
   if (status === 404) return { failure: 'bad_model', detail: message }
   if (status === 429) return { failure: 'rate_limited', detail: message }
+  if (status !== undefined && RETRYABLE.has(status)) return { failure: 'busy', detail: message }
   return { failure: 'unknown', detail: message }
 }
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** How hard to let the model think. Maps to Gemini's thinking levels. */
 export type Effort = 'minimal' | 'low' | 'medium' | 'high'
@@ -125,7 +142,7 @@ export async function callJson({
       high: ThinkingLevel.HIGH,
     } as const
 
-    const response = await ai.models.generateContent({
+    const request = {
       model: MODEL,
       contents: prompt,
       config: {
@@ -137,7 +154,23 @@ export async function callJson({
         responseJsonSchema: schema,
         thinkingConfig: { thinkingLevel: LEVELS[effort] },
       },
-    })
+    }
+
+    // Ride out a busy model rather than losing the whole run to it. Backoff is
+    // jittered so two stages of the same run don't retry in lockstep.
+    let response
+    for (let attempt = 1; ; attempt++) {
+      try {
+        response = await ai.models.generateContent(request)
+        break
+      } catch (err) {
+        const status = statusOf(err)
+        if (attempt >= MAX_ATTEMPTS || status === undefined || !RETRYABLE.has(status)) throw err
+        const backoff = 700 * 2 ** (attempt - 1) + Math.random() * 300
+        console.warn(`[playlist] ${status} from the model, retrying in ${Math.round(backoff)}ms`)
+        await wait(backoff)
+      }
+    }
 
     // A blocked prompt or a safety stop yields no text rather than throwing.
     const blocked = response.promptFeedback?.blockReason

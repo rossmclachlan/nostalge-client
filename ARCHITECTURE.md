@@ -179,9 +179,21 @@ around 2¢; standard pricing from 1 Jan 2027 doubles it. Stage 1 runs at `low` t
 stage 3 at `medium` — raise stage 3 to `high` if sequencing feels flat.
 
 ### Failure
-Every stage returns a `RunFailure` value rather than throwing: `no_key`, `no_data`,
-`offline`, `refused`, `empty`, `unknown`. `RunPanel` renders each as a quiet card. This is
-the "never an error state" rule applied to a feature that genuinely depends on a network.
+Every stage returns a `RunFailure` value rather than throwing — `no_key`, `no_data`,
+`offline`, `refused`, `empty`, `bad_key`, `bad_model`, `rate_limited`, `busy`, `unknown` —
+and `RunPanel` renders each as a quiet card naming the thing to go and check.
+
+The values are deliberately specific. A single "something went wrong" is worse than useless
+against a black-box API behind someone else's key: it sent a real user to check a key and a
+connection that were both fine, when the actual answer was a 503 from an overloaded model.
+So `gemini.ts` classifies the SDK's `ApiError.status`, shows the API's own message under the
+card, and logs it to the console **unconditionally** — this is a static site with no server
+logs, so that console line is the only forensic trail there is.
+
+`callJson` retries 500/502/503/504 up to three attempts with jittered exponential backoff.
+A run makes two API calls, so losing the planning *and* the dig to a transient blip is a bad
+trade. **429 is deliberately not retried** — a rate limit means slow down, and retrying into
+it makes things worse.
 
 ## Theming / design system (`src/styles/global.css`)
 - **Tokens in `@theme`**: paper/ink palette (`--color-paper*`, `--color-ink*`, `--color-kraft`), riso accents (`--color-riso-red/olive/yellow/blue`), fonts (`--font-display` Bebas Neue, `--font-body` Archivo — loaded via Google Fonts in `Layout.astro`), `--radius-sticker`, `--shadow-ink`, `--nav-active-bg`.
