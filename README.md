@@ -67,6 +67,13 @@ plus 2–7k output, at its introductory $0.75/$3.75 per million (rising to $1.50
 Saved playlists live in `localStorage` and open offline — only *building* one needs the
 network. The rest of the app is unaffected if you never set a key.
 
+## Claude connector (MCP server)
+
+[`mcp-server/`](./mcp-server) is a separate Python service that runs on the NAS next to
+PocketBase. It lets Claude (web, desktop, mobile) browse the library and build TIDAL playlists
+from it. See its [README](./mcp-server/README.md) for setup, the TIDAL login, the Cloudflare
+Tunnel and adding the connector in Claude.
+
 ## Data layer
 
 On load the app:

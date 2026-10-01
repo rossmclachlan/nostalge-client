@@ -1,0 +1,37 @@
+# Runs next to the music-cms-mvp stack and joins its Docker network, so it
+# reaches PocketBase as http://pocketbase:8090. Start music-cms-mvp first.
+#
+#   docker compose up -d --build
+#   docker compose run --rm nostalge-mcp python -m server login   # one-time TIDAL login
+
+services:
+  nostalge-mcp:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PB_URL: http://pocketbase:8090
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data          # TIDAL session + OAuth tokens (keep private)
+    ports:
+      - "8765:8000"           # LAN access for MCP Inspector; the tunnel doesn't need it
+    networks: [music-cms]
+
+  # Optional: Cloudflare Tunnel (see README). Enable with `docker compose --profile tunnel up -d`.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on: [nostalge-mcp]
+    networks: [music-cms]
+
+networks:
+  music-cms:
+    external: true
+    # Compose names it "<project folder>_default". The backend README clones into
+    # "music-cms", so this is usually right; check with `docker network ls`.
+    name: ${PB_DOCKER_NETWORK:-music-cms_default}
