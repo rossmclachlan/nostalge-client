@@ -29,7 +29,9 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+      # Compose interpolates this even when the `tunnel` profile isn't active, so it can't use
+      # the `:?required` form without breaking `docker compose up` for everyone else.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on: [nostalge-mcp]
     networks: [music-cms]
 
