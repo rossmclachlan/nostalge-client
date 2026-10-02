@@ -1,12 +1,12 @@
 # nostalge MCP server
 
 Lets Claude (claude.ai on the web, desktop and mobile) read your music library and build TIDAL
-playlists from it. Runs on the NAS next to PocketBase, reached through a Cloudflare Tunnel, protected by
+playlists from it. Runs on the NAS next to PocketBase, reached through Tailscale Funnel, protected by
 OAuth.
 
 ```
-Claude ──HTTPS──▶ Cloudflare Tunnel ──▶ nostalge-mcp (:8000) ──▶ PocketBase (music-cms-mvp)
-                                              └──────────────▶ TIDAL (tidalapi) · MusicBrainz
+Claude ──HTTPS──▶ Tailscale Funnel ──▶ nostalge-mcp (:8000) ──▶ PocketBase (music-cms-mvp)
+                                             └──────────────▶ TIDAL (tidalapi) · MusicBrainz
 ```
 
 ## Tools
@@ -132,10 +132,37 @@ Open the printed `link.tidal.com/...` URL, approve the device, and the session i
 `data/tidal-session.json`. Access tokens refresh automatically. If TIDAL ever revokes the session, tools
 return "TIDAL session is not valid … re-run the one-time login", and you run the same command again.
 
-### 6. Cloudflare Tunnel (documented, not automated)
+### 6. Expose it publicly: Tailscale Funnel
 
-Claude connects from Anthropic's servers, so the server needs a public HTTPS URL. A Cloudflare Tunnel
-provides one without opening any ports on your router.
+Claude connects from Anthropic's servers, so the server needs a public HTTPS URL. If the NAS is already
+on your tailnet, **Tailscale Funnel** gives you one without opening any ports on your router and without
+another container — it runs as a feature of the Tailscale client already installed on the NAS.
+
+**PocketBase must stay tailnet-only.** Only `nostalge-mcp` goes public; don't Funnel port 8095.
+
+1. In DSM, confirm the Tailscale package is up to date and that **MagicDNS**, **HTTPS Certificates**, and
+   the **Funnel** node attribute are enabled for this machine in the
+   [Tailscale admin console](https://login.tailscale.com/admin/machines) (Funnel is gated per-tailnet
+   under **Settings → Funnel** and may need enabling for the first time).
+2. On the NAS, start the funnel against the port already published in `docker-compose.yml`:
+   ```bash
+   tailscale funnel --bg 8765
+   ```
+   This serves `https://<nas-machine-name>.<tailnet-name>.ts.net` → `localhost:8765` →
+   `nostalge-mcp:8000`. Check status any time with `tailscale funnel status`.
+3. Set `PUBLIC_BASE_URL` in `.env` to that `https://...ts.net` hostname (no trailing slash, no path).
+4. Check it from outside your tailnet (e.g. your phone on cellular data):
+   - `curl https://<nas-machine-name>.<tailnet-name>.ts.net/healthz` should return ok.
+   - `curl -i -X POST https://<nas-machine-name>.<tailnet-name>.ts.net/mcp` should return **401** with a
+     `WWW-Authenticate` header.
+
+To stop exposing it: `tailscale funnel --https=443 off` (or the exact invocation `tailscale funnel
+status` shows).
+
+#### Alternative: Cloudflare Tunnel
+
+If you'd rather not rely on Tailscale Funnel (e.g. you want a custom domain, or the NAS isn't on your
+tailnet), the `cloudflared` service in `docker-compose.yml` sets up a Cloudflare Tunnel instead:
 
 1. In the Cloudflare dashboard, go to **Zero Trust → Networks → Tunnels → Create a tunnel →
    Cloudflared**, name it (e.g. `nas-mcp`), and copy the **tunnel token**.
@@ -146,10 +173,7 @@ provides one without opening any ports on your router.
    ```bash
    docker compose --profile tunnel up -d
    ```
-4. Check it from outside your network:
-   - `curl https://mcp.<your-domain>/healthz` should return ok.
-   - `curl -i -X POST https://mcp.<your-domain>/mcp` should return **401** with a `WWW-Authenticate`
-     header.
+4. Check it the same way as step 4 above, against `https://mcp.<your-domain>` instead.
 
 Notes:
 - **Don't put Cloudflare Access (Zero Trust login) in front of this hostname.** Claude's servers can't
