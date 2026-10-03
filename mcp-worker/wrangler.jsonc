@@ -31,8 +31,8 @@
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",
-      // Replace with the id printed by `npx wrangler kv namespace create OAUTH_KV` (not a secret).
-      "id": "<Add-KV-ID>"
+      // From `npx wrangler kv namespace create OAUTH_KV` (not a secret).
+      "id": "a468e527c2dd43f9a4d2b62203e13d3e"
     }
   ],
   "observability": {
