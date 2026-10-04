@@ -30,7 +30,8 @@ src/
 
   lib/
     types.ts                 PocketBase collection shapes + local cache shapes + ConnectionState
-    pb.ts                    PocketBase client + all network reads (healthCheck, paged fetchers, tracks, recent plays)
+    pb.ts                    PocketBase client + all network reads (healthCheck, paged fetchers, tracks, recent plays) + sign-in/session
+    useAuth.ts               Signed-in email ('' when signed out), re-rendering on session changes
     cache.ts                 localStorage read/write for MusicData (key `nostalge:data:v1`)
     useLibrary.ts            Main data hook: cache-first, MANUAL sync via refresh()
     useRecentPlays.ts        Recent-tab data hook: own cache (`nostalge:recent:v1`), manual refresh
@@ -57,6 +58,7 @@ src/
     App.tsx                  Root island: tab state, detail navigation stack, discoverySeed, Masthead
     BottomNav.tsx            Fixed 4-tab bottom nav (Tab type + ITEMS)
     Cover.tsx                Album/artist artwork with generated initials fallback + aged overlay
+    SignIn.tsx               SignInGate (email/password card shown when a sync needs a session) + SignedInAs (sign-out link)
     ThemeToggle.tsx          Light/dark flip (writes `nostalge:theme`, updates theme-color meta)
     InstallButton.tsx        PWA install button gated on `beforeinstallprompt`
     CopyButton.tsx           Copy-to-clipboard (async API + execCommand fallback)
@@ -96,13 +98,14 @@ Local cache shapes:
 - `fetchArtists` / `fetchAlbums` / `fetchTags` / `fetchPlays` (scrobbles → slim `PlayEvent[]`).
 - `fetchRecentPlays(100)` — newest scrobbles expanded to display fields (Recent tab).
 - `fetchTracksForAlbum(id)` — **on-demand only**; tracks are NOT cached.
+- **Sign-in**: the library collections are readable only by signed-in users, so the app authenticates against PocketBase's `users` collection. The SDK keeps the token in localStorage (`pocketbase_auth`) and attaches it to every read. `signIn(email, password)` → `'ok' | 'rejected' | 'unreachable'`; `signOut()`; `signedInEmail()` / `onAuthChange()` (wrapped by the `useAuth()` hook). `ensureSession()` runs after a passing health check: `authRefresh()` extends the token; a 401/403/404 clears it and returns `'signed-out'`, any other failure returns `'offline'`. Anonymous list requests against those rules return empty pages rather than errors, so the session check, not the fetchers, is what detects a missing sign-in.
 
 ### Hooks
-- **`useLibrary()`** — inits `data` from `loadCache()`, `connection` = cached/empty. **No sync on mount.** `refresh()` runs `sync()`: `healthCheck()` → if live, `Promise.all` the four fetchers → if non-empty, `saveCache` + `setData` + `connection='live'`. Guarded so a live-but-empty response never wipes a good cache.
-- **`useRecentPlays()`** — same pattern with its own cache key; also manual-refresh only.
+- **`useLibrary()`** — inits `data` from `loadCache()`, `connection` = cached/empty. **No sync on mount.** `refresh()` runs `sync()`: `healthCheck()` → if live, `ensureSession()` → if ok, `Promise.all` the fetchers → if non-empty, `saveCache` + `setData` + `connection='live'`. Guarded so a live-but-empty response never wipes a good cache. If the session check says `'signed-out'`, `needsSignIn` goes true and App shows `SignInGate` above the (still cached) tab body. Away from home the health check fails first, so it never asks for a sign-in it couldn't complete.
+- **`useRecentPlays()`** — same pattern with its own cache key and its own `needsSignIn`; also manual-refresh only. The Recent tab's status panel shows "signed in as … · sign out" (`SignedInAs`). Signing out keeps the cached library on the device.
 
 ### localStorage keys
-`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:gemini-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`).
+`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:gemini-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`) · `pocketbase_auth` (the SDK's session token, written by the SDK itself).
 
 ## UI / navigation (`src/components/App.tsx`)
 - **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | library | playlists | history`. Bottom-nav order: **Discover, Library, Sets, History**. Default tab: **discovery**. The grid is `grid-cols-4`.

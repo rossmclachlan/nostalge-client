@@ -4,10 +4,11 @@ import type { RecentPlay } from '@/lib/types'
 import { clockTime, dayHeading, relativeAge } from '@/lib/format'
 import { EmptyState } from '../ui'
 import { ClockIcon, RefreshIcon } from '../icons'
+import { SignedInAs, SignInGate } from '../SignIn'
 import { cn } from '@/lib/cn'
 
 export function RecentTab() {
-  const { plays, connection, syncing, refresh } = useRecentPlays()
+  const { plays, connection, syncing, needsSignIn, refresh } = useRecentPlays()
 
   // Group consecutive plays under day headings (already newest-first).
   const groups = useMemo(() => {
@@ -54,14 +55,19 @@ export function RecentTab() {
           <p className="label text-ink-3">
             {syncing
               ? 'checking the NAS…'
-              : connection === 'live'
+              : needsSignIn
+                ? 'the NAS answered · sign in to pull fresh plays'
+                : connection === 'live'
                 ? 'pulled fresh from the server'
                 : connection === 'cached'
                   ? 'showing last saved · tap ↻ to check the NAS'
                   : 'tap ↻ to check the NAS'}
           </p>
         </div>
+        <SignedInAs />
       </div>
+
+      {needsSignIn && <SignInGate onSignedIn={refresh} />}
 
       {plays.length === 0 ? (
         <EmptyState

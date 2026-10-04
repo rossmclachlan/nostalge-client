@@ -16,6 +16,7 @@ import { RecentTab } from './recent/RecentTab'
 import { PlaylistsTab } from './playlists/PlaylistsTab'
 import { PlaylistDetail } from './playlists/PlaylistDetail'
 import { SegmentedControl } from './ui'
+import { SignInGate } from './SignIn'
 
 type Detail =
   | { kind: 'artist'; id: string }
@@ -47,7 +48,7 @@ const HISTORY_SECTIONS: { id: HistorySection; label: string }[] = [
 const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
 
 export default function App() {
-  const { data, connection, syncing, refresh } = useLibrary()
+  const { data, connection, syncing, needsSignIn, refresh } = useLibrary()
   const [tab, setTab] = useState<Tab>('discovery')
   const [stack, setStack] = useState<Detail[]>([])
   // Kept here (App stays mounted) so the Discovery selection survives drilling
@@ -156,6 +157,8 @@ export default function App() {
             onRefresh={refresh}
           />
           <main className="pb-safe px-4 pt-4 sm:px-6 lg:px-8">
+            {needsSignIn && <SignInGate onSignedIn={refresh} />}
+
             {tab === 'discovery' && (
               <DiscoveryTab
                 data={data}
