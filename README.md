@@ -103,8 +103,11 @@ auto-injection doesn't run against Astro's generated pages.
 ## Prerequisites
 
 - The [music-cms-mvp](https://github.com/mclachlanr/music-cms-mvp) backend
-  running on your local network, with public read access enabled on the
-  `artists`, `albums`, `tracks`, `scrobbles` and `tags` collections.
+  running on your local network, with the `artists`, `albums`, `tracks`,
+  `scrobbles` and `tags` collections readable by signed-in users
+  (list/view rule `@request.auth.id != ""`), and a record for you in its
+  `users` collection. The app asks you to sign in the first time a refresh
+  reaches the server; the session is kept on the device.
 - Node.js 20+
 
 ## Setup

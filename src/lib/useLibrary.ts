@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { hasData, loadCache, saveCache } from './cache'
 import {
+  ensureSession,
   fetchAlbums,
   fetchArtists,
   fetchPlays,
@@ -9,11 +10,14 @@ import {
   healthCheck,
 } from './pb'
 import type { ConnectionState, MusicData } from './types'
+import { useAuth } from './useAuth'
 
 interface LibraryState {
   data: MusicData
   connection: ConnectionState
   syncing: boolean
+  /** The server answered but there's no usable session: ask for a sign-in. */
+  needsSignIn: boolean
   refresh: () => void
 }
 
@@ -26,6 +30,9 @@ interface LibraryState {
  *    network doesn't kick off a doomed health-check every time.
  *  - `refresh()` probes PocketBase; if it answers, fresh data replaces the
  *    cache, otherwise the cache stays put.
+ *  - The reads need a signed-in user. If the server answers but there's no
+ *    usable session, `needsSignIn` goes true and the cache stays put. Being
+ *    away from home never asks for a sign-in, since it couldn't succeed.
  *
  * There is no error state by design: worst case we show an empty/welcome
  * screen.
@@ -36,12 +43,18 @@ export function useLibrary(): LibraryState {
     hasData(loadCache()) ? 'cached' : 'empty',
   )
   const [syncing, setSyncing] = useState(false)
+  const [sessionRejected, setSessionRejected] = useState(false)
+  const email = useAuth()
 
   const sync = useCallback(async () => {
     setSyncing(true)
     try {
       const live = await healthCheck()
       if (!live) return // keep cached/empty state
+
+      const session = await ensureSession()
+      setSessionRejected(session === 'signed-out')
+      if (session !== 'ok') return
 
       const [artists, albums, tags, plays, tracks] = await Promise.all([
         fetchArtists(),
@@ -77,5 +90,8 @@ export function useLibrary(): LibraryState {
     void sync()
   }, [sync])
 
-  return { data, connection, syncing, refresh }
+  // Signing in (from anywhere) clears the prompt without waiting for a sync.
+  const needsSignIn = sessionRejected && email === ''
+
+  return { data, connection, syncing, needsSignIn, refresh }
 }

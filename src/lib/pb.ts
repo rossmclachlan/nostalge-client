@@ -1,8 +1,9 @@
-import PocketBase from 'pocketbase'
+import PocketBase, { type ClientResponseError } from 'pocketbase'
 import type { Album, Artist, PlayEvent, RecentPlay, Scrobble, Tag, Track, TrackPlay } from './types'
 
 /**
  * PocketBase lives on the home LAN and is only reachable some of the time.
+ * Its library collections need a signed-in user (see "Sign-in" below).
  * Every read here follows the same rules:
  *   - pass `{ requestKey: null }` so the SDK never auto-cancels a request
  *   - use `getList()` (paginated), never `getFullList()`
@@ -42,6 +43,66 @@ export async function healthCheck(timeoutMs = 2500): Promise<boolean> {
     return false
   } finally {
     clearTimeout(timer)
+  }
+}
+
+/**
+ * Sign-in. The library collections only answer signed-in listeners, so the
+ * app signs in as a normal record in PocketBase's `users` collection. The SDK
+ * keeps the token in localStorage (`pocketbase_auth`), so it survives reloads
+ * and every read below sends it automatically.
+ */
+const AUTH_COLLECTION = 'users'
+
+/** The signed-in email, or '' when signed out or the token has expired. */
+export function signedInEmail(): string {
+  return pb.authStore.isValid ? String(pb.authStore.model?.email ?? '') : ''
+}
+
+/** Calls back whenever the session changes. Returns the unsubscribe function. */
+export function onAuthChange(callback: () => void): () => void {
+  return pb.authStore.onChange(callback)
+}
+
+export type SignInResult = 'ok' | 'rejected' | 'unreachable'
+
+/** Never throws: 'rejected' is a wrong email/password, 'unreachable' is everything else. */
+export async function signIn(email: string, password: string): Promise<SignInResult> {
+  try {
+    await pb
+      .collection(AUTH_COLLECTION)
+      .authWithPassword(email.trim(), password, { requestKey: null })
+    return 'ok'
+  } catch (e) {
+    const status = (e as ClientResponseError).status ?? 0
+    return status >= 400 && status < 500 ? 'rejected' : 'unreachable'
+  }
+}
+
+export function signOut(): void {
+  pb.authStore.clear()
+}
+
+/**
+ * Run before every sync, once the health check has passed. Confirms the token
+ * still works and extends it.
+ *   - 'ok': go ahead and fetch
+ *   - 'signed-out': there's no usable session; ask the listener to sign in
+ *   - 'offline': the refresh failed for some other reason; stay quiet
+ * Never throws.
+ */
+export async function ensureSession(): Promise<'ok' | 'signed-out' | 'offline'> {
+  if (!pb.authStore.isValid) return 'signed-out'
+  try {
+    await pb.collection(AUTH_COLLECTION).authRefresh({ requestKey: null })
+    return 'ok'
+  } catch (e) {
+    const status = (e as ClientResponseError).status ?? 0
+    if (status === 401 || status === 403 || status === 404) {
+      pb.authStore.clear()
+      return 'signed-out'
+    }
+    return 'offline'
   }
 }
 

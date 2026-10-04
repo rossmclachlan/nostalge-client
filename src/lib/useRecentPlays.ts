@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
-import { fetchRecentPlays, healthCheck } from './pb'
+import { ensureSession, fetchRecentPlays, healthCheck } from './pb'
 import type { ConnectionState, RecentPlay } from './types'
+import { useAuth } from './useAuth'
 
 const KEY = 'nostalge:recent:v1'
 
@@ -29,6 +30,8 @@ interface RecentState {
   syncing: boolean
   /** when we last successfully pulled live data (epoch ms), or 0 */
   checkedAt: number
+  /** The server answered but there's no usable session: ask for a sign-in. */
+  needsSignIn: boolean
   refresh: () => void
 }
 
@@ -44,12 +47,17 @@ export function useRecentPlays(): RecentState {
   )
   const [syncing, setSyncing] = useState(false)
   const [checkedAt, setCheckedAt] = useState(0)
+  const [sessionRejected, setSessionRejected] = useState(false)
+  const email = useAuth()
 
   const sync = useCallback(async () => {
     setSyncing(true)
     try {
       const live = await healthCheck()
       if (!live) return
+      const session = await ensureSession()
+      setSessionRejected(session === 'signed-out')
+      if (session !== 'ok') return
       const fresh = await fetchRecentPlays(100)
       if (fresh.length === 0) return
       save(fresh)
@@ -65,5 +73,12 @@ export function useRecentPlays(): RecentState {
 
   // No auto-fetch: the user pulls fresh data with the refresh button. This
   // keeps reloads/visits from firing a health-check when away from the NAS.
-  return { plays, connection, syncing, checkedAt, refresh: () => void sync() }
+  return {
+    plays,
+    connection,
+    syncing,
+    checkedAt,
+    needsSignIn: sessionRejected && email === '',
+    refresh: () => void sync(),
+  }
 }
