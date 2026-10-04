@@ -9,10 +9,9 @@ import type { Props } from "./utils";
 
 // GitHub logins allowed to use this server (compared case-insensitively).
 // Anyone else can complete the GitHub sign-in but gets no tools.
-// TODO: add your GitHub username, e.g. "rossmclachlan".
 const ALLOWED_USERNAMES = new Set<string>(
 	[
-		// "your-github-username",
+		"rossmclachlan",
 	].map((u: string) => u.toLowerCase()),
 );
 
