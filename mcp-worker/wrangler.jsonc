@@ -1,0 +1,44 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nostalge-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-10",
+  "compatibility_flags": ["nodejs_compat"],
+  /**
+   * Secrets (never put them in this file); set each with `npx wrangler secret put <NAME>`:
+   *   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, COOKIE_ENCRYPTION_KEY,
+   *   PB_URL, PB_EMAIL, PB_PASSWORD
+   * See README.md.
+   */
+  "migrations": [
+    {
+      "new_sqlite_classes": ["NostalgeMCP"],
+      "tag": "v1"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "NostalgeMCP",
+        "name": "MCP_OBJECT"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      // From `npx wrangler kv namespace create OAUTH_KV` (not a secret).
+      "id": "a468e527c2dd43f9a4d2b62203e13d3e"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "dev": {
+    "port": 8788
+  }
+}
