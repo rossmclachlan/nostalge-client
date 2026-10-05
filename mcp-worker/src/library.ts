@@ -68,29 +68,58 @@ function track(t: TrackRec) {
 	};
 }
 
+/** Matched artists/albums whose tracks a search also returns; keeps the filter short. */
+const SEARCH_FAN_OUT = 10;
+
+/**
+ * Two steps, because a filter like `artist.name~"x"` on tracks makes
+ * PocketBase join artists for every one of ~130k tracks, which took 10-25s.
+ * First match the small artists/albums tables by name, then fetch albums and
+ * tracks by those ids (indexed) or by their own title.
+ */
 export async function searchLibrary(pb: PocketBase, query: string, limit?: number) {
 	const q = pbString(query.trim());
 	const perPage = clamp(limit, 10, 50);
-	const [artists, albums, tracks] = await Promise.all([
+	const [artists, albumsByTitle] = await Promise.all([
 		pb.list<ArtistRec>("artists", { filter: `name~${q}`, sort: "-play_count", perPage, skipTotal: true }),
 		pb.list<AlbumRec>("albums", {
-			filter: `(title~${q} || artist.name~${q})`,
+			filter: `title~${q}`,
 			sort: "-play_count",
 			expand: "artist,tag_relations",
 			perPage,
 			skipTotal: true,
 		}),
+	]);
+
+	const anyOf = (field: string, ids: string[]) => ids.map((id) => `${field}=${pbString(id)}`);
+	const artistIds = artists.items.slice(0, SEARCH_FAN_OUT).map((a) => a.id);
+	const albumIds = albumsByTitle.items.slice(0, SEARCH_FAN_OUT).map((a) => a.id);
+	const [albumsByArtist, tracks] = await Promise.all([
+		artistIds.length
+			? pb.list<AlbumRec>("albums", {
+					filter: anyOf("artist", artistIds).join(" || "),
+					sort: "-play_count",
+					expand: "artist,tag_relations",
+					perPage,
+					skipTotal: true,
+				})
+			: Promise.resolve({ items: [] as AlbumRec[] }),
 		pb.list<TrackRec>("tracks", {
-			filter: `(title~${q} || artist.name~${q} || album.title~${q})`,
+			filter: [`title~${q}`, ...anyOf("artist", artistIds), ...anyOf("album", albumIds)].join(" || "),
 			sort: "-play_count",
 			expand: "artist,album",
 			perPage,
 			skipTotal: true,
 		}),
 	]);
+
+	const releases = new Map([...albumsByTitle.items, ...albumsByArtist.items].map((a) => [a.id, a]));
 	return {
 		artists: artists.items.map((a) => ({ id: a.id, name: a.name, play_count: a.play_count ?? 0 })),
-		releases: albums.items.map(release),
+		releases: [...releases.values()]
+			.sort((a, b) => (b.play_count ?? 0) - (a.play_count ?? 0))
+			.slice(0, perPage)
+			.map(release),
 		tracks: tracks.items.map(track),
 	};
 }
