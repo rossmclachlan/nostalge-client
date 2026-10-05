@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { Octokit } from "octokit";
+import { finishLogin } from "./tidal";
 import { fetchUpstreamAuthToken, getUpstreamAuthorizeUrl, type Props } from "./utils";
 import {
 	addApprovedClient,
@@ -199,6 +200,33 @@ app.get("/callback", async (c) => {
 		status: 302,
 		headers,
 	});
+});
+
+/**
+ * TIDAL login callback (see connect_tidal). The state in the link is a
+ * single-use secret that only an allowlisted user's tool call can create, so
+ * this route needs no GitHub session of its own.
+ */
+app.get("/tidal/callback", async (c) => {
+	const page = (title: string, body: string, status: 200 | 400 | 500) =>
+		c.html(
+			`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+				`<title>${title}</title><body style="font:16px system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem">` +
+				`<h1>${title}</h1><p>${body}</p></body>`,
+			status,
+		);
+	const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+	try {
+		const session = await finishLogin(c.env, new URL(c.req.url));
+		return page(
+			"TIDAL connected",
+			`Nostalge can now build playlists in your TIDAL account${session.country ? ` (${escape(session.country)})` : ""}. You can close this tab.`,
+			200,
+		);
+	} catch (e) {
+		console.error("TIDAL callback failed:", e);
+		return page("TIDAL not connected", escape(e instanceof Error ? e.message : String(e)), 400);
+	}
 });
 
 export { app as GitHubHandler };

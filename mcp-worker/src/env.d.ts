@@ -8,6 +8,8 @@ interface NostalgeSecrets {
 	PB_URL: string;
 	PB_EMAIL: string;
 	PB_PASSWORD: string;
+	/** Client id of the app registered at developer.tidal.com */
+	TIDAL_CLIENT_ID: string;
 }
 
 interface Env extends NostalgeSecrets {}

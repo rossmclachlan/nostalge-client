@@ -11,9 +11,15 @@
   /**
    * Secrets (never put them in this file); set each with `npx wrangler secret put <NAME>`:
    *   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, COOKIE_ENCRYPTION_KEY,
-   *   PB_URL, PB_EMAIL, PB_PASSWORD
+   *   PB_URL, PB_EMAIL, PB_PASSWORD, TIDAL_CLIENT_ID
    * See README.md.
    */
+  "vars": {
+    // Public address of this Worker; the TIDAL login redirects back to <PUBLIC_URL>/tidal/callback.
+    "PUBLIC_URL": "https://nostalge-mcp.mclachlanrd.workers.dev",
+    // Outbound requests one tool call may make: 50 on Workers Free. Raise it on a paid plan.
+    "SUBREQUEST_LIMIT": "50"
+  },
   "migrations": [
     {
       "new_sqlite_classes": ["NostalgeMCP"],

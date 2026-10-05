@@ -4,6 +4,8 @@
 interface __BaseEnv_Env {
 	OAUTH_KV: KVNamespace;
 	MCP_OBJECT: DurableObjectNamespace /* NostalgeMCP */;
+	PUBLIC_URL: "https://nostalge-mcp.mclachlanrd.workers.dev";
+	SUBREQUEST_LIMIT: "50";
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
