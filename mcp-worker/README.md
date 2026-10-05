@@ -21,6 +21,13 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
 | `connect_tidal()` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes) |
 | `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
+| `list_tidal_playlists(limit?)` | Your own TIDAL playlists, most recently changed first, with ids, track counts and links |
+| `get_tidal_playlist(playlist_id, offset?)` | A playlist's details and tracks with 1-based positions, 100 per call |
+| `add_to_tidal_playlist(playlist_id, track_ids[] or tidal_track_ids[], position?, dry_run?)` | Adds library tracks (matched like `create_tidal_playlist`) or TIDAL track ids, appended or inserted before a position. Skips tracks already there. `dry_run` defaults to `true` |
+| `remove_from_tidal_playlist(playlist_id, positions[]?, tidal_track_ids[]?)` | Removes tracks by position, and/or every occurrence of given TIDAL ids |
+| `move_tidal_playlist_tracks(playlist_id, from_positions[], to_position)` | Moves tracks (keeping their order) to before a position; track count + 1 moves them to the end. Re-reads the playlist to confirm the new order |
+| `update_tidal_playlist(playlist_id, name?, description?, visibility?)` | Renames a playlist, or changes its description or visibility (`PUBLIC` / `UNLISTED`) |
+| `delete_tidal_playlist(playlist_id, confirm_name)` | Deletes a playlist. `confirm_name` must be its exact current name |
 
 **How the PocketBase schema maps to these tools.** The schema comes from the `music-cms-mvp`
 migrations. It has no `crates` or `releases` collections, so:
@@ -223,6 +230,34 @@ allows 10,000, and most playlists then finish in one call.
 - Both writes send an `Idempotency-Key`, and progress is saved after each batch, so retries
   never duplicate the playlist or its tracks.
 - Calling again with `dry_run=false` and the same name returns the existing playlist.
+
+## Editing TIDAL playlists
+
+The editing tools only work on playlists you own; TIDAL refuses changes to anyone else's.
+
+**Positions.**
+- Positions are 1-based and always refer to the playlist's current order: every tool re-reads the
+  playlist before acting.
+- TIDAL identifies each occurrence of a track by its own item id, so a track that appears twice
+  can be removed or moved one occurrence at a time.
+
+**Adding.**
+- `add_to_tidal_playlist` reuses `create_tidal_playlist`'s matching jobs and saved matches. A
+  preview made with one tool is reused by the other.
+- Each add run has its own `Idempotency-Key`, so a resumed run never duplicates tracks. Adding
+  the same tracks again later really adds them; duplicates are skipped either way.
+
+**Moving to the end.** TIDAL can only move items to *before* another item. To move tracks to
+the end, the tool moves every track after them to just before them instead. Either way it
+re-reads the playlist and reports `order_confirmed`.
+
+**Size limit.** Reading a playlist costs one request per page of items. On Workers Free (50
+requests per call), very long playlists, roughly 500 or more tracks, can't be read in one call,
+and the tools say so rather than working on a partial list.
+
+**Checking the playlist tools.** `npx tsx scripts/check-playlist-tools.mts` runs the tools against
+an in-memory mock of TIDAL's playlist API, written from the OpenAPI types in `@tidal-music/api`.
+It checks paging, positions, add/remove/move semantics, idempotent retries, and refusals.
 
 **Checking the matching port.** `node scripts/check-matching-parity.mjs` scores a fixed set of
 tracks with both the Python and TypeScript matchers and fails on any difference. It needs

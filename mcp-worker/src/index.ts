@@ -7,6 +7,15 @@ import { getCrate, listCrates, releasesByTag, searchLibrary } from "./library";
 import { createTidalPlaylist } from "./playlist";
 import { PocketBase } from "./pocketbase";
 import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
+import {
+	addToTidalPlaylist,
+	deleteTidalPlaylist,
+	getTidalPlaylist,
+	listTidalPlaylists,
+	moveInTidalPlaylist,
+	removeFromTidalPlaylist,
+	updateTidalPlaylist,
+} from "./tidal-playlists";
 import type { Props } from "./utils";
 
 // GitHub logins allowed to use this server (compared case-insensitively).
@@ -137,6 +146,114 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 						{ pb: this.pb(budget.fetch), tidal: new Tidal(this.env, budget), budget, storage: this.ctx.storage },
 					);
 				}),
+		);
+
+		// -- Editing the user's own TIDAL playlists -------------------------------------
+		const tidal = () => new Tidal(this.env, this.budget());
+		const playlistId = z.string().min(1).max(100).describe("TIDAL playlist id (from list_tidal_playlists or create_tidal_playlist)");
+		const positions = z.array(z.number().int().min(1)).max(500);
+
+		this.server.tool(
+			"list_tidal_playlists",
+			"List the user's own TIDAL playlists, most recently changed first, with ids, track counts and links.",
+			{ limit: z.number().int().min(1).max(200).optional().describe("Max playlists (default 50)") },
+			async ({ limit }) => this.run("list_tidal_playlists", { limit }, () => listTidalPlaylists(tidal(), limit ?? 50)),
+		);
+
+		this.server.tool(
+			"get_tidal_playlist",
+			"Show a TIDAL playlist's details and its tracks with 1-based positions (100 per call; use offset for more). Positions are what the remove and move tools take.",
+			{
+				playlist_id: playlistId,
+				offset: z.number().int().min(0).optional().describe("Skip this many tracks (default 0)"),
+			},
+			async ({ playlist_id, offset }) =>
+				this.run("get_tidal_playlist", { playlist_id, offset }, () => getTidalPlaylist(tidal(), playlist_id, offset ?? 0)),
+		);
+
+		this.server.tool(
+			"add_to_tidal_playlist",
+			[
+				"Add tracks to one of the user's TIDAL playlists, appended or inserted before a position.",
+				"Pass library track ids (matched on TIDAL first, like create_tidal_playlist) or TIDAL track ids. Tracks already in the playlist are skipped.",
+				"dry_run=true (default) previews; call again with dry_run=false once the user agrees.",
+				"While the result has status 'in_progress', call again with exactly the same arguments.",
+			].join(" "),
+			{
+				playlist_id: playlistId,
+				track_ids: z.array(z.string().min(1)).min(1).max(500).optional().describe("Library track ids, in order"),
+				tidal_track_ids: z.array(z.string().min(1)).min(1).max(500).optional().describe("TIDAL track ids, in order"),
+				position: z.number().int().min(1).optional().describe("Insert before the track now at this 1-based position (default: append)"),
+				dry_run: z.boolean().optional().describe("true (default): preview only; false: add the tracks"),
+			},
+			async ({ playlist_id, track_ids, tidal_track_ids, position, dry_run }) =>
+				this.run(
+					"add_to_tidal_playlist",
+					{ playlist_id, tracks: track_ids?.length, tidal_tracks: tidal_track_ids?.length, position, dry_run: dry_run ?? true },
+					() => {
+						const budget = this.budget();
+						return addToTidalPlaylist(
+							{ playlist_id, track_ids, tidal_track_ids, position, dry_run: dry_run ?? true },
+							{ pb: this.pb(budget.fetch), tidal: new Tidal(this.env, budget), budget, storage: this.ctx.storage },
+						);
+					},
+				),
+		);
+
+		this.server.tool(
+			"remove_from_tidal_playlist",
+			"Remove tracks from one of the user's TIDAL playlists, by 1-based position (from get_tidal_playlist) and/or every occurrence of given TIDAL track ids. Takes effect immediately.",
+			{
+				playlist_id: playlistId,
+				positions: positions.optional().describe("1-based positions to remove"),
+				tidal_track_ids: z.array(z.string().min(1)).max(500).optional().describe("Remove every occurrence of these TIDAL track ids"),
+			},
+			async ({ playlist_id, positions, tidal_track_ids }) =>
+				this.run("remove_from_tidal_playlist", { playlist_id, positions, tidal_track_ids }, () =>
+					removeFromTidalPlaylist(tidal(), { playlist_id, positions, tidal_track_ids }),
+				),
+		);
+
+		this.server.tool(
+			"move_tidal_playlist_tracks",
+			"Reorder one of the user's TIDAL playlists: move the tracks at from_positions (keeping their order) to just before the track now at to_position; use the track count + 1 to move them to the end. Confirms the new order.",
+			{
+				playlist_id: playlistId,
+				from_positions: positions.min(1).describe("1-based positions of the tracks to move"),
+				to_position: z.number().int().min(1).describe("1-based position to move them before (track count + 1 = end)"),
+			},
+			async ({ playlist_id, from_positions, to_position }) =>
+				this.run("move_tidal_playlist_tracks", { playlist_id, from_positions, to_position }, () =>
+					moveInTidalPlaylist(tidal(), { playlist_id, from_positions, to_position }),
+				),
+		);
+
+		this.server.tool(
+			"update_tidal_playlist",
+			"Rename one of the user's TIDAL playlists, or change its description or visibility.",
+			{
+				playlist_id: playlistId,
+				name: z.string().min(1).max(200).optional(),
+				description: z.string().max(500).optional(),
+				visibility: z.enum(["PUBLIC", "UNLISTED"]).optional().describe("PUBLIC (on your profile) or UNLISTED (link only)"),
+			},
+			async ({ playlist_id, name, description, visibility }) =>
+				this.run("update_tidal_playlist", { playlist_id, name, visibility }, () =>
+					updateTidalPlaylist(tidal(), { playlist_id, name, description, visibility }),
+				),
+		);
+
+		this.server.tool(
+			"delete_tidal_playlist",
+			"Permanently delete one of the user's TIDAL playlists. Only do this when the user asked; confirm_name must be the playlist's exact current name.",
+			{
+				playlist_id: playlistId,
+				confirm_name: z.string().min(1).max(200).describe("The playlist's exact name, as a safety check"),
+			},
+			async ({ playlist_id, confirm_name }) =>
+				this.run("delete_tidal_playlist", { playlist_id, confirm_name }, () =>
+					deleteTidalPlaylist(tidal(), { playlist_id, confirm_name }),
+				),
 		);
 	}
 }

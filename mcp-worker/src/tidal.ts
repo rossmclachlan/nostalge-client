@@ -203,7 +203,60 @@ type Resource = {
 	attributes?: Record<string, unknown>;
 	relationships?: Record<string, { data?: { id: string; type: string }[] | { id: string; type: string } | null }>;
 };
-type Doc = { data?: Resource | Resource[]; included?: Resource[]; meta?: Record<string, unknown> };
+type Doc = {
+	data?: Resource | Resource[];
+	included?: Resource[];
+	meta?: Record<string, unknown>;
+	links?: { next?: string; self?: string };
+};
+
+/** A track with the names needed to show or match it. */
+export type TrackInfo = {
+	tidal_id: string;
+	title: string;
+	version: string | null;
+	duration_s: number | null;
+	isrc: string | null;
+	artists: string[];
+	album: string;
+	available: boolean;
+};
+
+/** One occurrence of a track (or video) in a playlist. itemId tells duplicates apart. */
+export type PlaylistItem = { id: string; type: string; itemId: string };
+
+export type PlaylistInfo = {
+	id: string;
+	name: string;
+	description: string;
+	visibility: string;
+	tracks: number | null;
+	created_at: string | null;
+	modified_at: string | null;
+	url: string;
+};
+
+function playlistInfo(p: Resource): PlaylistInfo {
+	const a = p.attributes ?? {};
+	const links = (a.externalLinks ?? []) as { href?: string }[];
+	const count = a.numberOfItems ?? a.numberOfTrackItems;
+	return {
+		id: p.id,
+		name: String(a.name ?? ""),
+		description: String(a.description ?? ""),
+		visibility: String(a.accessType ?? ""),
+		tracks: typeof count === "number" ? count : null,
+		created_at: typeof a.createdAt === "string" ? a.createdAt : null,
+		modified_at: typeof a.lastModifiedAt === "string" ? a.lastModifiedAt : null,
+		url: links.find((l) => l.href)?.href ?? `https://tidal.com/playlist/${p.id}`,
+	};
+}
+
+/** The cursor from a JSON:API `links.next` (absolute or relative), if there is a next page. */
+function nextCursor(doc: Doc): string | null {
+	if (!doc.links?.next) return null;
+	return new URL(doc.links.next, API).searchParams.get("page[cursor]");
+}
 
 /** "PT3M58S" -> 238 */
 export function isoSeconds(d: unknown): number | null {
@@ -245,7 +298,7 @@ export class Tidal {
 	}
 
 	private async request(
-		method: "GET" | "POST",
+		method: "GET" | "POST" | "PATCH" | "DELETE",
 		path: string,
 		opts: { query?: [string, string][]; body?: unknown; idempotencyKey?: string } = {},
 	): Promise<Doc> {
@@ -305,22 +358,28 @@ export class Tidal {
 			.slice(0, Math.min(limit, TRACK_LOOKUP_MAX));
 		if (ids.length === 0) return [];
 
-		const doc = await this.request("GET", "/tracks", {
-			query: [...ids.map((id): [string, string] => ["filter[id]", id]), ["include", "artists"], ["include", "albums"]],
-		});
-		const included = new Map((doc.included ?? []).map((r) => [`${r.type}:${r.id}`, r]));
-		const byId = new Map(asList(doc.data).map((t) => [t.id, t]));
-		return ids.flatMap((id) => {
-			const t = byId.get(id);
-			if (!t) return [];
-			const a = t.attributes ?? {};
-			const names = (type: string, rel: string, field: string) =>
-				asList(t.relationships?.[rel]?.data)
-					.map((x) => included.get(`${type}:${x.id}`)?.attributes?.[field])
-					.filter((x): x is string => typeof x === "string" && x !== "");
-			const availability = a.availability;
-			return [
-				{
+		const details = await this.trackDetails(ids);
+		return ids.flatMap((id) => details.get(id) ?? []);
+	}
+
+	/** Names, duration and availability for tracks, 20 per request. */
+	async trackDetails(ids: string[]): Promise<Map<string, TrackInfo>> {
+		const out = new Map<string, TrackInfo>();
+		const unique = [...new Set(ids)];
+		for (let i = 0; i < unique.length; i += TRACK_LOOKUP_MAX) {
+			const batch = unique.slice(i, i + TRACK_LOOKUP_MAX);
+			const doc = await this.request("GET", "/tracks", {
+				query: [...batch.map((id): [string, string] => ["filter[id]", id]), ["include", "artists"], ["include", "albums"]],
+			});
+			const included = new Map((doc.included ?? []).map((r) => [`${r.type}:${r.id}`, r]));
+			for (const t of asList(doc.data)) {
+				const a = t.attributes ?? {};
+				const names = (type: string, rel: string, field: string) =>
+					asList(t.relationships?.[rel]?.data)
+						.map((x) => included.get(`${type}:${x.id}`)?.attributes?.[field])
+						.filter((x): x is string => typeof x === "string" && x !== "");
+				const availability = a.availability;
+				out.set(t.id, {
 					tidal_id: t.id,
 					title: String(a.title ?? ""),
 					version: typeof a.version === "string" && a.version ? a.version : null,
@@ -329,9 +388,10 @@ export class Tidal {
 					artists: names("artists", "artists", "name"),
 					album: names("albums", "albums", "title")[0] ?? "",
 					available: Array.isArray(availability) ? availability.includes("STREAM") : true,
-				},
-			];
-		});
+				});
+			}
+		}
+		return out;
 	}
 
 	async createPlaylist(name: string, description: string, idempotencyKey: string): Promise<{ id: string; url: string }> {
@@ -345,13 +405,90 @@ export class Tidal {
 		return { id: p.id, url: links.find((l) => l.href)?.href ?? `https://tidal.com/playlist/${p.id}` };
 	}
 
-	/** Appends up to 50 tracks, skipping any already in the playlist. Returns how many were added. */
-	async addTracks(playlistId: string, trackIds: string[], idempotencyKey: string): Promise<number> {
+	/**
+	 * Adds up to 50 tracks, skipping any already in the playlist. Appends unless
+	 * positionBefore (an itemId) is given. Returns how many were added.
+	 */
+	async addTracks(playlistId: string, trackIds: string[], idempotencyKey: string, positionBefore?: string): Promise<number> {
 		const doc = await this.request("POST", `/playlists/${encodeURIComponent(playlistId)}/relationships/items`, {
-			body: { data: trackIds.map((id) => ({ id, type: "tracks" })), meta: { onDuplicates: "SKIP" } },
+			body: {
+				data: trackIds.map((id) => ({ id, type: "tracks" })),
+				meta: { onDuplicates: "SKIP", ...(positionBefore ? { positionBefore } : {}) },
+			},
 			idempotencyKey,
 		});
 		const skipped = asList((doc.meta as { skipped?: unknown[] } | undefined)?.skipped).length;
 		return trackIds.length - skipped;
+	}
+
+	/** Playlists the signed-in user owns, most recently changed first. */
+	async myPlaylists(maxPages = 5): Promise<{ playlists: PlaylistInfo[]; more: boolean }> {
+		const playlists: PlaylistInfo[] = [];
+		let cursor: string | null = null;
+		for (let page = 0; page < maxPages; page++) {
+			const doc = await this.request("GET", "/playlists", {
+				query: [["filter[owners.id]", "me"], ["sort", "-lastModifiedAt"], ...(cursor ? [["page[cursor]", cursor] as [string, string]] : [])],
+			});
+			playlists.push(...asList(doc.data).map(playlistInfo));
+			cursor = nextCursor(doc);
+			if (!cursor) return { playlists, more: false };
+		}
+		return { playlists, more: true };
+	}
+
+	async playlist(playlistId: string): Promise<PlaylistInfo> {
+		const doc = await this.request("GET", `/playlists/${encodeURIComponent(playlistId)}`);
+		const p = asList(doc.data)[0];
+		if (!p) throw new TidalError(`No TIDAL playlist with id ${playlistId}`);
+		return playlistInfo(p);
+	}
+
+	/** Every item in playlist order, following page cursors. One request per page. */
+	async playlistItems(playlistId: string, maxPages = 30): Promise<PlaylistItem[]> {
+		const items: PlaylistItem[] = [];
+		let cursor: string | null = null;
+		for (let page = 0; page < maxPages; page++) {
+			const doc = await this.request("GET", `/playlists/${encodeURIComponent(playlistId)}/relationships/items`, {
+				query: cursor ? [["page[cursor]", cursor]] : [],
+			});
+			for (const r of asList(doc.data) as (Resource & { meta?: { itemId?: string } })[]) {
+				items.push({ id: r.id, type: r.type, itemId: r.meta?.itemId ?? "" });
+			}
+			cursor = nextCursor(doc);
+			if (!cursor) return items;
+		}
+		throw new TidalError(`Playlist ${playlistId} is too long to read in one call (over ${maxPages} pages)`);
+	}
+
+	/** Removes specific occurrences (by itemId), 50 per request. */
+	async removeItems(playlistId: string, items: PlaylistItem[]): Promise<void> {
+		for (let i = 0; i < items.length; i += ADD_BATCH) {
+			await this.request("DELETE", `/playlists/${encodeURIComponent(playlistId)}/relationships/items`, {
+				body: { data: items.slice(i, i + ADD_BATCH).map((x) => ({ id: x.id, type: x.type, meta: { itemId: x.itemId } })) },
+			});
+		}
+	}
+
+	/** Moves items, keeping their relative order, to just before the item with itemId positionBefore. */
+	async moveItems(playlistId: string, items: PlaylistItem[], positionBefore: string): Promise<void> {
+		await this.request("PATCH", `/playlists/${encodeURIComponent(playlistId)}/relationships/items`, {
+			body: {
+				data: items.map((x) => ({ id: x.id, type: x.type, meta: { itemId: x.itemId } })),
+				meta: { positionBefore },
+			},
+		});
+	}
+
+	async updatePlaylist(
+		playlistId: string,
+		attributes: { name?: string; description?: string; accessType?: "PUBLIC" | "UNLISTED" },
+	): Promise<void> {
+		await this.request("PATCH", `/playlists/${encodeURIComponent(playlistId)}`, {
+			body: { data: { id: playlistId, type: "playlists", attributes } },
+		});
+	}
+
+	async deletePlaylist(playlistId: string): Promise<void> {
+		await this.request("DELETE", `/playlists/${encodeURIComponent(playlistId)}`);
 	}
 }
