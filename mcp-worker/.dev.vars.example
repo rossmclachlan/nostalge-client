@@ -5,3 +5,4 @@ COOKIE_ENCRYPTION_KEY=<openssl rand -hex 32>
 PB_URL=https://<nas>.<tailnet>.ts.net
 PB_EMAIL=<pocketbase superuser email>
 PB_PASSWORD=<pocketbase superuser password>
+TIDAL_CLIENT_ID=<client id from developer.tidal.com>

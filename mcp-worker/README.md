@@ -7,7 +7,8 @@ template.
 ```
 Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶ PocketBase on the NAS
             │
-            └─ OAuth: sign in with GitHub; only ALLOWED_USERNAMES get tools
+            ├─ OAuth: sign in with GitHub; only ALLOWED_USERNAMES get tools
+            └─ TIDAL API (openapi.tidal.com), signed in once via /tidal/callback
 ```
 
 ## Tools
@@ -18,7 +19,8 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `list_crates(limit?, page?)` | Crates, most played first, with artist, year and tags |
 | `get_crate(crateId)` | One crate with artist, tags, notes and its tracklist |
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
-| `create_tidal_playlist(name, description?, tracks[])` | **Stub.** Returns `not_implemented` (see the TODO in `src/index.ts`) |
+| `connect_tidal()` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes) |
+| `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
 
 **How the PocketBase schema maps to these tools.** The schema comes from the `music-cms-mvp`
 migrations. It has no `crates` or `releases` collections, so:
@@ -107,7 +109,11 @@ npx wrangler secret put COOKIE_ENCRYPTION_KEY   # paste the output of: openssl r
 npx wrangler secret put PB_URL                  # https://<nas>.<tailnet>.ts.net  (no trailing slash needed)
 npx wrangler secret put PB_EMAIL                # the superuser from step 5
 npx wrangler secret put PB_PASSWORD
+npx wrangler secret put TIDAL_CLIENT_ID         # from step 10 (add it once you have it)
 ```
+
+You can also add them in the Cloudflare dashboard: **Workers & Pages → nostalge-mcp → Settings →
+Variables and Secrets**, type **Secret**.
 
 ### 8. Add the connector in Claude
 
@@ -133,6 +139,20 @@ Add two repository secrets (**Settings → Secrets and variables → Actions**):
 - **`CLOUDFLARE_ACCOUNT_ID`:** shown in the Workers & Pages overview sidebar.
 
 Worker secrets (step 7) are not touched by deploys.
+
+### 10. Connect TIDAL
+
+1. At [developer.tidal.com](https://developer.tidal.com), create an app:
+   - Scopes: `playlists.read`, `playlists.write`, `search.read` and `user.read`.
+   - Redirect URI: `https://<worker>.workers.dev/tidal/callback`. It must match `PUBLIC_URL` in
+     `wrangler.jsonc` plus `/tidal/callback`.
+2. Add its **Client ID** as the Worker secret `TIDAL_CLIENT_ID`. The client secret isn't needed,
+   because the login uses PKCE.
+3. In Claude, ask it to connect TIDAL. The `connect_tidal` tool returns a link. Open it, sign in
+   to TIDAL and approve. The page should say "TIDAL connected".
+
+The session is stored in `OAUTH_KV`, encrypted with a key derived from `COOKIE_ENCRYPTION_KEY`.
+Changing that key disconnects TIDAL; run step 3 again.
 
 ## Security
 
@@ -167,14 +187,43 @@ npm run cf-typegen                # after changing bindings in wrangler.jsonc
 
 Secrets are declared for TypeScript in `src/env.d.ts`, because `wrangler types` only sees bindings.
 
-## The TIDAL stub
+## How TIDAL playlists are built
 
-`create_tidal_playlist` validates its input and returns `{"status": "not_implemented"}` without
-contacting TIDAL. The TODO in `src/index.ts` lists what's needed:
+`create_tidal_playlist` takes library track ids from `get_crate` or `search_library`.
 
-- TIDAL OAuth (authorization code + PKCE) with a stored refresh token
-- catalogue search and match scoring
-- the playlist create/add-items calls, with batching and 429 backoff
-- a `dry_run` flag
+**Matching.** Each track is searched on TIDAL, trying up to three queries from most to least
+specific. Candidates are scored by `src/matching.ts`, a port of `../mcp-server/server/matching.py`:
+- similarity of title, artist and album, plus duration within ±5 s
+- penalties for live, karaoke, cover, sped-up and similar versions the library track isn't
 
-The Python server in `../mcp-server` has tested matching logic that can be ported.
+A track matches at a confidence of 0.80 or more. Anything lower is reported as a miss with the
+reason and the best candidate, never guessed. The Python server also looks up ISRCs through
+MusicBrainz; the Worker doesn't, to save requests.
+
+**Shared cache.** Matches are written to PocketBase's `tidal_matches`, which the Python server
+reads and writes too, so each server reuses the other's matches.
+
+**Workers Free and its request limit.** On the free plan, one tool call can make only 50
+outbound requests. Each track costs:
+- 2 requests per search query, and up to 3 queries
+- 1 request to write the match to the cache
+
+So the tool works as a resumable job:
+- Each call matches as many tracks as fit, saves progress in the Durable Object's storage, and
+  returns `status: "in_progress"`.
+- Calling again with the same arguments continues.
+- A 60-track playlist takes about four calls to preview and one more to create.
+
+`SUBREQUEST_LIMIT` in `wrangler.jsonc` sets the per-call budget. Raise it on a paid plan, which
+allows 10,000, and most playlists then finish in one call.
+
+**Writes.**
+- The playlist is created unlisted.
+- Tracks are added in batches of 50, skipping any already in the playlist.
+- Both writes send an `Idempotency-Key`, and progress is saved after each batch, so retries
+  never duplicate the playlist or its tracks.
+- Calling again with `dry_run=false` and the same name returns the existing playlist.
+
+**Checking the matching port.** `node scripts/check-matching-parity.mjs` scores a fixed set of
+tracks with both the Python and TypeScript matchers and fails on any difference. It needs
+`python3`.

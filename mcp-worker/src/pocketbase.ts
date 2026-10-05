@@ -67,6 +67,8 @@ export class PocketBase {
 		baseUrl: string,
 		private readonly email: string,
 		private readonly password: string,
+		/** Swap in a counting fetch to keep within the Worker's subrequest limit. */
+		private readonly fetcher: typeof fetch = fetch,
 	) {
 		if (!baseUrl || !email || !password) {
 			throw new PocketBaseError("PocketBase is not configured: set the PB_URL, PB_EMAIL and PB_PASSWORD secrets");
@@ -81,7 +83,7 @@ export class PocketBase {
 	private async authenticate(): Promise<string> {
 		const paths = workingAuthPath ? [workingAuthPath] : AUTH_PATHS;
 		for (const path of paths) {
-			const res = await fetch(this.baseUrl + path, {
+			const res = await this.fetcher(this.baseUrl + path, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ identity: this.email, password: this.password }),
@@ -117,10 +119,17 @@ export class PocketBase {
 	private async get<T>(path: string, params: Record<string, string>): Promise<T> {
 		const url = new URL(this.baseUrl + path);
 		for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+		return this.send<T>("GET", url);
+	}
 
+	private async send<T>(method: "GET" | "POST" | "PATCH", url: URL, body?: unknown): Promise<T> {
 		for (let attempt = 0; attempt < 2; attempt++) {
-			const res = await fetch(url, {
-				headers: { Authorization: await this.token() },
+			const headers: Record<string, string> = { Authorization: await this.token() };
+			if (body !== undefined) headers["Content-Type"] = "application/json";
+			const res = await this.fetcher(url, {
+				method,
+				headers,
+				body: body === undefined ? undefined : JSON.stringify(body),
 				signal: AbortSignal.timeout(TIMEOUT_MS),
 			});
 			if ((res.status === 401 || res.status === 403) && attempt === 0) {
@@ -159,6 +168,19 @@ export class PocketBase {
 		return this.get(
 			`/api/collections/${encodeURIComponent(collection)}/records/${id}`,
 			expand ? { expand } : {},
+		);
+	}
+
+	create<T>(collection: string, data: Record<string, unknown>): Promise<T> {
+		return this.send("POST", new URL(`${this.baseUrl}/api/collections/${encodeURIComponent(collection)}/records`), data);
+	}
+
+	update<T>(collection: string, id: string, data: Record<string, unknown>): Promise<T> {
+		if (!isRecordId(id)) throw new PocketBaseError(`Not a valid record id: ${JSON.stringify(id)}`, 400);
+		return this.send(
+			"PATCH",
+			new URL(`${this.baseUrl}/api/collections/${encodeURIComponent(collection)}/records/${id}`),
+			data,
 		);
 	}
 }

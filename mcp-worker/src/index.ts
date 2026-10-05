@@ -4,7 +4,9 @@ import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 import { GitHubHandler } from "./github-handler";
 import { getCrate, listCrates, releasesByTag, searchLibrary } from "./library";
+import { createTidalPlaylist } from "./playlist";
 import { PocketBase } from "./pocketbase";
+import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
 import type { Props } from "./utils";
 
 // GitHub logins allowed to use this server (compared case-insensitively).
@@ -27,8 +29,14 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 		version: "0.1.0",
 	});
 
-	private pb(): PocketBase {
-		return new PocketBase(this.env.PB_URL, this.env.PB_EMAIL, this.env.PB_PASSWORD);
+	private pb(fetcher?: typeof fetch): PocketBase {
+		return new PocketBase(this.env.PB_URL, this.env.PB_EMAIL, this.env.PB_PASSWORD, fetcher);
+	}
+
+	/** Outbound requests one tool call may make (Workers Free: 50), less one for headroom. */
+	private budget(): Budget {
+		const limit = Number(this.env.SUBREQUEST_LIMIT) || 50;
+		return new Budget(Math.max(10, limit - 1));
 	}
 
 	/** Log the call (never secrets), and turn failures into a readable tool error. */
@@ -90,40 +98,44 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 		);
 
 		this.server.tool(
+			"connect_tidal",
+			"Check whether TIDAL is connected, and get a one-time link (valid 10 minutes) for the user to open in a browser and sign in to TIDAL. Needed once before create_tidal_playlist, and again if TIDAL access is revoked.",
+			{},
+			async () =>
+				this.run("connect_tidal", {}, async () => {
+					const status = await connectionStatus(this.env);
+					return {
+						...status,
+						login_link: await startLogin(this.env),
+						message: status.connected
+							? "TIDAL is already connected. Only open the link to switch accounts or reconnect."
+							: "Ask the user to open login_link, sign in to TIDAL and approve access, then try again.",
+					};
+				}),
+		);
+
+		this.server.tool(
 			"create_tidal_playlist",
-			"Create a TIDAL playlist from a list of tracks. NOT IMPLEMENTED YET: currently returns status 'not_implemented' without contacting TIDAL.",
+			[
+				"Create a private (unlisted) TIDAL playlist from library tracks, in the given order.",
+				"Use track ids from get_crate or search_library.",
+				"dry_run=true (the default) matches each track on TIDAL and reports matches and misses without changing anything:",
+				"show those to the user and only call again with dry_run=false once they agree.",
+				"Long lists are processed over several calls: while the result has status 'in_progress', call again with exactly the same arguments.",
+			].join(" "),
 			{
 				name: z.string().min(1).max(200).describe("Playlist name"),
 				description: z.string().max(500).optional().describe("Playlist description"),
-				tracks: z
-					.array(z.object({ artist: z.string().min(1), title: z.string().min(1) }))
-					.min(1)
-					.max(500)
-					.describe("Tracks in playlist order"),
+				track_ids: z.array(z.string().min(1)).min(1).max(500).describe("Library track ids, in playlist order"),
+				dry_run: z.boolean().optional().describe("true (default): preview matches only; false: create the playlist"),
 			},
-			async ({ name, description, tracks }) =>
-				this.run("create_tidal_playlist", { name, tracks: tracks.length }, async () => {
-					// TODO(tidal): implement playlist creation. Needed:
-					//  1. TIDAL auth: register an app at developer.tidal.com and run the OAuth 2.1
-					//     authorization-code + PKCE flow once (scopes: playlists.read playlists.write,
-					//     search.read). Store the refresh token in KV (encrypted) or as a secret, and
-					//     refresh the ~1h access token on demand. This is a second OAuth flow, separate
-					//     from the GitHub one that protects this server; add a /tidal/callback route.
-					//  2. Matching: for each {artist, title}, search the TIDAL catalogue (v2 API,
-					//     openapi.tidal.com/v2/searchResults/{query}?include=tracks), score candidates on
-					//     normalised title/artist similarity and duration, and skip live/karaoke/cover/
-					//     sped-up versions. Return misses with reasons rather than guessing.
-					//  3. Writes: POST /v2/playlists (name, description, accessType PRIVATE), then
-					//     POST /v2/playlists/{id}/relationships/items in batches (<= 20 per request),
-					//     retrying 429s with backoff (honour Retry-After).
-					//  4. Add a dry_run flag (default true) so Claude previews matches before writing.
-					//  The Python server in ../mcp-server/server/{matching,tidal}.py has tested scoring
-					//  logic that can be ported.
-					return {
-						status: "not_implemented",
-						message: "TIDAL playlist creation is not implemented yet; nothing was sent to TIDAL.",
-						received: { name, description: description ?? null, track_count: tracks.length },
-					};
+			async ({ name, description, track_ids, dry_run }) =>
+				this.run("create_tidal_playlist", { name, tracks: track_ids.length, dry_run: dry_run ?? true }, () => {
+					const budget = this.budget();
+					return createTidalPlaylist(
+						{ name, description: description ?? "", track_ids, dry_run: dry_run ?? true },
+						{ pb: this.pb(budget.fetch), tidal: new Tidal(this.env, budget), budget, storage: this.ctx.storage },
+					);
 				}),
 		);
 	}
