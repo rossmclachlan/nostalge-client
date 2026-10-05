@@ -5,7 +5,8 @@
  *   artists  name, mbid, play_count, tags(json), tag_relations -> tags[]
  *   albums   title, artist -> artists, release_year, play_count, track_count,
  *            wiki_summary, tags(json), tag_relations -> tags[]
- *   tracks   title, artist -> artists, album -> albums, duration_ms, play_count
+ *   tracks   title, artist -> artists, album -> albums, duration_ms, play_count,
+ *            first_played_at, last_played_at (play stats derived from scrobbles)
  *   tags     name (unique), slug (unique), usage_count
  *
  * There are no "crates" or "releases" collections. Matching the app's Crates
@@ -38,6 +39,8 @@ type TrackRec = Base & {
 	album: string;
 	duration_ms: number;
 	play_count: number;
+	first_played_at: string;
+	last_played_at: string;
 	expand?: { artist?: ArtistRec; album?: AlbumRec };
 };
 
@@ -65,6 +68,8 @@ function track(t: TrackRec) {
 		album_id: t.album || null,
 		duration_s: t.duration_ms ? Math.round(t.duration_ms / 1000) : null,
 		play_count: t.play_count ?? 0,
+		first_played: t.first_played_at ? t.first_played_at.slice(0, 10) : null,
+		last_played: t.last_played_at ? t.last_played_at.slice(0, 10) : null,
 	};
 }
 
@@ -184,4 +189,67 @@ export async function releasesByTag(pb: PocketBase, tag: string, limit?: number)
 		perPage: clamp(limit, 50, 200),
 	});
 	return { tag: found.name, found: true, total: albums.totalItems, releases: albums.items.map(release) };
+}
+
+export const TRACK_SORTS = {
+	most_played: "-play_count,-last_played_at",
+	least_played: "play_count,last_played_at",
+	recently_played: "-last_played_at",
+	first_played_newest: "-first_played_at",
+	first_played_oldest: "first_played_at",
+	longest: "-duration_ms",
+	shortest: "duration_ms",
+} as const;
+
+export type FindTracksOptions = {
+	min_plays?: number;
+	max_plays?: number;
+	min_duration_s?: number;
+	max_duration_s?: number;
+	/** YYYY-MM-DD, inclusive */
+	first_played_from?: string;
+	first_played_to?: string;
+	last_played_from?: string;
+	last_played_to?: string;
+	sort?: keyof typeof TRACK_SORTS;
+	limit?: number;
+	page?: number;
+};
+
+/**
+ * Tracks filtered by play count, length and when they were first/last played,
+ * all indexed columns. Play stats come from scrobbles, so "first played" is
+ * the useful stand-in for "date added" (most tracks were bulk-imported).
+ */
+export async function findTracks(pb: PocketBase, o: FindTracksOptions) {
+	const day = (d: string, end: boolean) => pbString(`${d} ${end ? "23:59:59.999Z" : "00:00:00.000Z"}`);
+	const where: string[] = [];
+	if (o.min_plays !== undefined) where.push(`play_count>=${o.min_plays}`);
+	if (o.max_plays !== undefined) where.push(`play_count<=${o.max_plays}`);
+	if (o.min_duration_s !== undefined || o.max_duration_s !== undefined) where.push("duration_ms>0");
+	if (o.min_duration_s !== undefined) where.push(`duration_ms>=${o.min_duration_s * 1000}`);
+	if (o.max_duration_s !== undefined) where.push(`duration_ms<=${o.max_duration_s * 1000}`);
+	for (const [field, from, to] of [
+		["first_played_at", o.first_played_from, o.first_played_to],
+		["last_played_at", o.last_played_from, o.last_played_to],
+	] as const) {
+		if (from || to) where.push(`${field}!=""`);
+		if (from) where.push(`${field}>=${day(from, false)}`);
+		if (to) where.push(`${field}<=${day(to, true)}`);
+	}
+	const sort = o.sort ?? "most_played";
+	// Sorting by a play date only makes sense among tracks that have been played.
+	if (/played_at/.test(TRACK_SORTS[sort]) && !where.some((w) => w.startsWith("first_played_at") || w.startsWith("last_played_at"))) {
+		where.push("last_played_at!=\"\"");
+	}
+	if (/duration_ms/.test(TRACK_SORTS[sort]) && !where.includes("duration_ms>0")) where.push("duration_ms>0");
+
+	const res = await pb.list<TrackRec>("tracks", {
+		filter: where.join(" && "),
+		sort: TRACK_SORTS[sort] + ",id",
+		expand: "artist,album",
+		perPage: clamp(o.limit, 25, 100),
+		page: Math.max(1, o.page ?? 1),
+	});
+	return { page: res.page, total_pages: res.totalPages, total: res.totalItems, sort, tracks: res.items.map(track) };
 }

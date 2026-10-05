@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 import { GitHubHandler } from "./github-handler";
-import { getCrate, listCrates, releasesByTag, searchLibrary } from "./library";
+import { findTracks, getCrate, listCrates, releasesByTag, searchLibrary, TRACK_SORTS } from "./library";
 import { createTidalPlaylist } from "./playlist";
 import { PocketBase } from "./pocketbase";
 import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
@@ -104,6 +104,34 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				limit: z.number().int().min(1).max(200).optional().describe("Max releases (default 50)"),
 			},
 			async ({ tag, limit }) => this.run("releases_by_tag", { tag, limit }, () => releasesByTag(this.pb(), tag, limit)),
+		);
+
+		const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");
+		this.server.tool(
+			"find_tracks",
+			[
+				"Find library tracks by listening history and length: play count, when first and last played, and duration.",
+				"Play counts and dates come from the user's full scrobble history (back to 2006).",
+				"'First played' is the best stand-in for 'date added', since most tracks were bulk-imported on one day.",
+				"Only ~73% of tracks have a duration; duration filters skip the rest. Paginated.",
+			].join(" "),
+			{
+				min_plays: z.number().int().min(0).optional().describe("At least this many plays"),
+				max_plays: z.number().int().min(0).optional().describe("At most this many plays (0 = never played)"),
+				min_duration_s: z.number().int().min(0).optional().describe("Minimum length in seconds"),
+				max_duration_s: z.number().int().min(1).optional().describe("Maximum length in seconds"),
+				first_played_from: isoDate.optional().describe("First played on or after (YYYY-MM-DD)"),
+				first_played_to: isoDate.optional().describe("First played on or before (YYYY-MM-DD)"),
+				last_played_from: isoDate.optional().describe("Last played on or after (YYYY-MM-DD)"),
+				last_played_to: isoDate.optional().describe("Last played on or before (YYYY-MM-DD)"),
+				sort: z
+					.enum(Object.keys(TRACK_SORTS) as [keyof typeof TRACK_SORTS, ...(keyof typeof TRACK_SORTS)[]])
+					.optional()
+					.describe("Default most_played"),
+				limit: z.number().int().min(1).max(100).optional().describe("Tracks per page (default 25)"),
+				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
+			},
+			async (opts) => this.run("find_tracks", opts, () => findTracks(this.pb(), opts)),
 		);
 
 		this.server.tool(

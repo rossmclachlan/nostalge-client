@@ -19,6 +19,7 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `list_crates(limit?, page?)` | Crates, most played first, with artist, year and tags |
 | `get_crate(crateId)` | One crate with artist, tags, notes and its tracklist |
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
+| `find_tracks(min_plays?, max_plays?, min_duration_s?, max_duration_s?, first_played_from?, first_played_to?, last_played_from?, last_played_to?, sort?, limit?, page?)` | Tracks by play count, length and when they were first or last played. Sorts: `most_played`, `least_played`, `recently_played`, `first_played_newest`, `first_played_oldest`, `longest`, `shortest` |
 | `connect_tidal()` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes) |
 | `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
 | `list_tidal_playlists(limit?)` | Your own TIDAL playlists, most recently changed first, with ids, track counts and links |
@@ -35,6 +36,9 @@ migrations. It has no `crates` or `releases` collections, so:
 - A **crate** is an album, matching the app's Crates tab.
 - A **release** is that same album.
 - Tags come from the albums' `tag_relations`.
+- A track's `play_count`, `first_played_at` and `last_played_at` are derived from scrobbles by
+  music-cms (migration 013 and the sync service). "First played" stands in for "date added",
+  since most tracks were created by one bulk import.
 
 Tools are registered only when the signed-in GitHub login is in `ALLOWED_USERNAMES`
 (`src/index.ts`). Anyone else can finish the GitHub sign-in but sees no tools.
