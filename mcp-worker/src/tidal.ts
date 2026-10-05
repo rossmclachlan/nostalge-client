@@ -131,7 +131,10 @@ export async function startLogin(env: TidalEnv): Promise<string> {
 
 type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; user_id?: number | string };
 
-async function tokenRequest(form: Record<string, string>, f: typeof fetch = fetch): Promise<TokenResponse> {
+async function tokenRequest(
+	form: Record<string, string>,
+	f: typeof fetch = (input, init) => fetch(input, init),
+): Promise<TokenResponse> {
 	const res = await f(TOKEN_URL, {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded" },

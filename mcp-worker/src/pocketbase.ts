@@ -67,8 +67,12 @@ export class PocketBase {
 		baseUrl: string,
 		private readonly email: string,
 		private readonly password: string,
-		/** Swap in a counting fetch to keep within the Worker's subrequest limit. */
-		private readonly fetcher: typeof fetch = fetch,
+		/**
+		 * Swap in a counting fetch to keep within the Worker's subrequest limit. The
+		 * default is wrapped because Workers throw "Illegal invocation" when fetch is
+		 * called as a method of another object, as `this.fetcher(...)` would.
+		 */
+		private readonly fetcher: typeof fetch = (input, init) => fetch(input, init),
 	) {
 		if (!baseUrl || !email || !password) {
 			throw new PocketBaseError("PocketBase is not configured: set the PB_URL, PB_EMAIL and PB_PASSWORD secrets");
