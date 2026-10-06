@@ -16,7 +16,7 @@ import { isRecordId, type PocketBase, pbString } from "./pocketbase";
 import { ADD_BATCH, type Budget, OutOfBudget, type Tidal, TidalError } from "./tidal";
 
 export const MIN_CONFIDENCE = 0.8;
-const JOB_PREFIX = "tidal-job:";
+export const JOB_PREFIX = "tidal-job:";
 const JOB_TTL_MS = 3 * 24 * 3600 * 1000;
 /** Record ids per PocketBase "a || b || ..." filter; keeps URLs short. */
 const LOOKUP_CHUNK = 50;
@@ -27,7 +27,7 @@ type Brief = { title: string; artist: string; album: string };
 type Lib = Brief & { duration_s: number | null };
 type CacheRow = { id: string; library_track: string; tidal_id: string; confidence: number; matched_title?: string; matched_artist?: string; matched_album?: string };
 
-type Matched = {
+export type Matched = {
 	track_id: string;
 	matched: true;
 	method: "cache" | "search";
@@ -46,9 +46,16 @@ type Missed = {
 };
 type Result = Matched | Missed;
 
-type PlaylistProgress = { id: string; url: string; added: number; batches_done: number };
+export type PlaylistProgress = {
+	id: string;
+	url: string;
+	added: number;
+	batches_done: number;
+	/** Per-run id for Idempotency-Keys, so resuming is safe but a later, separate add isn't swallowed. */
+	run?: string;
+};
 
-type Job = {
+export type Job = {
 	created: number;
 	ids: string[];
 	/** Library details, null when the id isn't a library track. Filled in chunks. */
@@ -60,18 +67,18 @@ type Job = {
 	playlists: Record<string, PlaylistProgress>;
 };
 
-type Deps = { pb: PocketBase; tidal: Tidal; budget: Budget; storage: DurableObjectStorage };
+export type Deps = { pb: PocketBase; tidal: Tidal; budget: Budget; storage: DurableObjectStorage };
 
-async function sha256(text: string): Promise<string> {
+export async function sha256(text: string): Promise<string> {
 	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
 	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
 }
 
 const brief = (l: Lib): Brief => ({ title: l.title, artist: l.artist, album: l.album });
-const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
+export const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 const anyOf = (field: string, ids: string[]) => ids.map((id) => `${field}=${pbString(id)}`).join(" || ");
 
-async function loadJob(storage: DurableObjectStorage, key: string, ids: string[]): Promise<Job> {
+export async function loadJob(storage: DurableObjectStorage, key: string, ids: string[]): Promise<Job> {
 	const existing = await storage.get<Job>(key);
 	if (existing) return existing;
 	// Starting a new job: drop ones nobody has touched for a few days.
@@ -189,21 +196,35 @@ async function remember(job: Job, r: Matched, { pb }: Deps): Promise<void> {
 	}
 }
 
-function summary(job: Job) {
+/** Matches every track in the job that isn't matched yet. Throws OutOfBudget when the call's allowance runs out. */
+export async function matchAll(job: Job, deps: Deps): Promise<void> {
+	await lookUp(job, deps);
+	for (const id of job.ids) {
+		if (job.results[id]) continue;
+		const lib = job.library[id];
+		if (!lib) continue;
+		if (deps.budget.remaining < MIN_FOR_TRACK) throw new OutOfBudget();
+		const { result } = await matchOne(id, lib, deps);
+		job.results[id] = result;
+		if (result.matched) await remember(job, result, deps);
+	}
+}
+
+export function summary(job: Job) {
 	const results = job.ids.map((id) => job.results[id]).filter((r): r is Result => !!r);
 	const matches = results.filter((r): r is Matched => r.matched);
 	const misses = results.filter((r): r is Missed => !r.matched);
 	return { matched_count: matches.length, miss_count: misses.length, matches, misses };
 }
 
-function inProgress(job: Job, step: "matching" | "adding", detail: string) {
+export function inProgress(job: Job, step: "matching" | "adding", detail: string, tool = "create_tidal_playlist") {
 	const done = job.ids.filter((id) => job.results[id]).length;
 	return {
 		status: "in_progress",
 		step,
 		matched_so_far: done,
 		total: job.ids.length,
-		message: `${detail} Call create_tidal_playlist again with exactly the same arguments to continue; progress is saved.`,
+		message: `${detail} Call ${tool} again with exactly the same arguments to continue; progress is saved.`,
 	};
 }
 
@@ -221,16 +242,7 @@ export async function createTidalPlaylist(
 
 		// 1. Match every track, as far as this call's budget goes.
 		try {
-			await lookUp(job, deps);
-			for (const id of job.ids) {
-				if (job.results[id]) continue;
-				const lib = job.library[id];
-				if (!lib) continue;
-				if (deps.budget.remaining < MIN_FOR_TRACK) throw new OutOfBudget();
-				const { result } = await matchOne(id, lib, deps);
-				job.results[id] = result;
-				if (result.matched) await remember(job, result, deps);
-			}
+			await matchAll(job, deps);
 		} catch (e) {
 			if (!(e instanceof OutOfBudget)) throw e;
 			return inProgress(job, "matching", "Matched as many tracks as one call allows (Cloudflare caps requests per call).");

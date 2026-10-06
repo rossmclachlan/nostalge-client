@@ -38,5 +38,7 @@
 
 		/* Skip type checking all .d.ts files. */
 		"skipLibCheck": true
-	}
+	},
+	/* Node dev scripts (scripts/) run with tsx, not in the Worker */
+	"exclude": ["node_modules", "scripts"]
 }
