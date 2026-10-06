@@ -17,6 +17,13 @@ import {
 	updateTidalPlaylist,
 } from "./tidal-playlists";
 import type { Props } from "./utils";
+import {
+	changeTidalFavourites,
+	FAVOURITE_KINDS,
+	listTidalFavourites,
+	similarTidalArtists,
+	tidalRecommendations,
+} from "./tidal-collection";
 
 // GitHub logins allowed to use this server (compared case-insensitively).
 // Anyone else can complete the GitHub sign-in but gets no tools.
@@ -145,7 +152,9 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 						...status,
 						login_link: await startLogin(this.env),
 						message: status.connected
-							? "TIDAL is already connected. Only open the link to switch accounts or reconnect."
+							? status.missing_permissions
+								? `TIDAL is connected, but without ${status.missing_permissions.join(", ")} (favourites and recommendations). Ask the user to open login_link and approve again to add them.`
+								: "TIDAL is already connected. Only open the link to switch accounts or reconnect."
 							: "Ask the user to open login_link, sign in to TIDAL and approve access, then try again.",
 					};
 				}),
@@ -173,6 +182,54 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 						{ name, description: description ?? "", track_ids, dry_run: dry_run ?? true },
 						{ pb: this.pb(budget.fetch), tidal: new Tidal(this.env, budget), budget, storage: this.ctx.storage },
 					);
+				}),
+		);
+
+		// -- TIDAL favourites, recommendations and similar artists ------------------------
+		const tidalClient = () => new Tidal(this.env, this.budget());
+		const favouriteKind = z.enum(FAVOURITE_KINDS).describe("tracks, albums or artists");
+
+		this.server.tool(
+			"list_tidal_favourites",
+			"List the user's TIDAL favourites (tracks, albums or artists), most recently added first.",
+			{ kind: favouriteKind, limit: z.number().int().min(1).max(200).optional().describe("Max items (default 50)") },
+			async ({ kind, limit }) => this.run("list_tidal_favourites", { kind, limit }, () => listTidalFavourites(tidalClient(), kind, limit ?? 50)),
+		);
+
+		this.server.tool(
+			"add_tidal_favourites",
+			"Add tracks, albums or artists to the user's TIDAL favourites, by TIDAL id (from search_tidal, get_tidal_playlist or similar_tidal_artists).",
+			{ kind: favouriteKind, tidal_ids: z.array(z.string().min(1)).min(1).max(200).describe("TIDAL ids") },
+			async ({ kind, tidal_ids }) =>
+				this.run("add_tidal_favourites", { kind, count: tidal_ids.length }, () => changeTidalFavourites(tidalClient(), kind, "add", tidal_ids)),
+		);
+
+		this.server.tool(
+			"remove_tidal_favourites",
+			"Remove tracks, albums or artists from the user's TIDAL favourites, by TIDAL id. Only when the user asked.",
+			{ kind: favouriteKind, tidal_ids: z.array(z.string().min(1)).min(1).max(200).describe("TIDAL ids") },
+			async ({ kind, tidal_ids }) =>
+				this.run("remove_tidal_favourites", { kind, count: tidal_ids.length }, () => changeTidalFavourites(tidalClient(), kind, "remove", tidal_ids)),
+		);
+
+		this.server.tool(
+			"get_tidal_recommendations",
+			"Get TIDAL's personal recommendation mixes for the user: daily, discovery and new-release mixes. Each mix is a playlist; read its tracks with get_tidal_playlist.",
+			{},
+			async () => this.run("get_tidal_recommendations", {}, () => tidalRecommendations(tidalClient())),
+		);
+
+		this.server.tool(
+			"similar_tidal_artists",
+			"Artists TIDAL considers similar to one artist (name or TIDAL id), each marked in_library or not. Good for discovery seeded from the library.",
+			{
+				artist: z.string().min(1).max(200).describe("Artist name or TIDAL artist id"),
+				limit: z.number().int().min(1).max(50).optional().describe("Max artists (default 20)"),
+			},
+			async ({ artist, limit }) =>
+				this.run("similar_tidal_artists", { artist, limit }, () => {
+					const budget = this.budget();
+					return similarTidalArtists({ tidal: new Tidal(this.env, budget), pb: this.pb(budget.fetch) }, artist, limit ?? 20);
 				}),
 		);
 

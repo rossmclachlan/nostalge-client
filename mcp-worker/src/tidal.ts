@@ -15,7 +15,9 @@ import type { Candidate } from "./matching";
 const API = "https://openapi.tidal.com/v2";
 const AUTHORIZE_URL = "https://login.tidal.com/authorize";
 const TOKEN_URL = "https://auth.tidal.com/v1/oauth2/token";
-const SCOPES = "playlists.read playlists.write search.read user.read";
+// collection.* (favourites) and recommendations.read were added after the first
+// release; sessions from before then lack them until the user reconnects.
+const SCOPES = "playlists.read playlists.write search.read user.read collection.read collection.write recommendations.read";
 const SESSION_KEY = "tidal:session";
 const PKCE_PREFIX = "tidal:pkce:";
 const PKCE_TTL_S = 600;
@@ -57,6 +59,8 @@ export class TidalNotConnected extends Error {
 export class TidalError extends Error {}
 
 type Session = {
+	/** Space-separated scopes TIDAL granted, when it said (sessions from before this was recorded don't have it). */
+	scope?: string;
 	access_token: string;
 	refresh_token: string;
 	expires_at: number;
@@ -129,7 +133,7 @@ export async function startLogin(env: TidalEnv): Promise<string> {
 	return url.href;
 }
 
-type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; user_id?: number | string };
+type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; user_id?: number | string; scope?: string };
 
 async function tokenRequest(
 	form: Record<string, string>,
@@ -173,6 +177,7 @@ export async function finishLogin(env: TidalEnv, url: URL): Promise<Session> {
 		expires_at: Date.now() + (tok.expires_in ?? 3600) * 1000,
 		country: "",
 		user_id: String(tok.user_id ?? ""),
+		scope: tok.scope ?? SCOPES,
 	};
 	if (!session.refresh_token) throw new TidalError("TIDAL returned no refresh token");
 
@@ -190,20 +195,26 @@ export async function finishLogin(env: TidalEnv, url: URL): Promise<Session> {
 	return session;
 }
 
-export async function connectionStatus(env: TidalEnv): Promise<{ connected: boolean; country?: string }> {
+export async function connectionStatus(
+	env: TidalEnv,
+): Promise<{ connected: boolean; country?: string; missing_permissions?: string[] }> {
 	const s = await loadSession(env);
-	return s ? { connected: true, country: s.country || undefined } : { connected: false };
+	if (!s) return { connected: false };
+	// Sessions saved before scopes were recorded may predate favourites/recommendations access.
+	const granted = new Set((s.scope ?? "playlists.read playlists.write search.read user.read").split(/\s+/));
+	const missing = SCOPES.split(" ").filter((x) => !granted.has(x));
+	return { connected: true, country: s.country || undefined, ...(missing.length ? { missing_permissions: missing } : {}) };
 }
 
 // -- API client --------------------------------------------------------------------
 
-type Resource = {
+export type Resource = {
 	id: string;
 	type: string;
 	attributes?: Record<string, unknown>;
 	relationships?: Record<string, { data?: { id: string; type: string }[] | { id: string; type: string } | null }>;
 };
-type Doc = {
+export type Doc = {
 	data?: Resource | Resource[];
 	included?: Resource[];
 	meta?: Record<string, unknown>;
@@ -265,7 +276,7 @@ export function isoSeconds(d: unknown): number | null {
 	return Math.round(Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0));
 }
 
-const asList = <T>(x: T | T[] | null | undefined): T[] => (x == null ? [] : Array.isArray(x) ? x : [x]);
+export const asList = <T>(x: T | T[] | null | undefined): T[] => (x == null ? [] : Array.isArray(x) ? x : [x]);
 
 export class Tidal {
 	private session: Session | null = null;
@@ -297,7 +308,8 @@ export class Tidal {
 		await saveSession(this.env, this.session);
 	}
 
-	private async request(
+	/** One API call with token refresh and retries; also used by the tidal-*.ts tool modules. */
+	async request(
 		method: "GET" | "POST" | "PATCH" | "DELETE",
 		path: string,
 		opts: { query?: [string, string][]; body?: unknown; idempotencyKey?: string } = {},
