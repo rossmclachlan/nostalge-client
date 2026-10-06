@@ -16,6 +16,7 @@ import {
 	removeFromTidalPlaylist,
 	updateTidalPlaylist,
 } from "./tidal-playlists";
+import { compareArtistWithTidal } from "./tidal-compare";
 import type { Props } from "./utils";
 
 // GitHub logins allowed to use this server (compared case-insensitively).
@@ -282,6 +283,20 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				this.run("delete_tidal_playlist", { playlist_id, confirm_name }, () =>
 					deleteTidalPlaylist(tidal(), { playlist_id, confirm_name }),
 				),
+		);
+
+		this.server.tool(
+			"compare_artist_with_tidal",
+			"Compare one artist's releases in the library with their releases on TIDAL: what's only in the library (not on TIDAL), what's only on TIDAL (not in the library), and what's in both. Editions such as 'Deluxe' or 'Remastered' count as the same release. For tracks missing within a release, use create_tidal_playlist's dry run.",
+			{
+				artist: z.string().min(1).max(200).describe("Library artist name (case-insensitive) or id"),
+				tidal_artist_id: z.string().min(1).max(30).optional().describe("TIDAL artist id, if the name finds the wrong artist"),
+			},
+			async ({ artist, tidal_artist_id }) =>
+				this.run("compare_artist_with_tidal", { artist, tidal_artist_id }, () => {
+					const budget = this.budget();
+					return compareArtistWithTidal({ tidal: new Tidal(this.env, budget), pb: this.pb(budget.fetch) }, { artist, tidal_artist_id });
+				}),
 		);
 	}
 }
