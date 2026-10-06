@@ -18,6 +18,7 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `search_library(query, limit?)` | Artists, releases (albums) and tracks whose names match |
 | `list_crates(limit?, page?)` | Crates, most played first, with artist, year and tags |
 | `get_crate(crateId)` | One crate with artist, tags, notes and its tracklist |
+| `get_artist(artist, include_tracks?)` | One artist's whole catalogue: every release (year, tags, plays) and every track with play stats. Duplicate track records are merged so each song appears once |
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
 | `find_tracks(min_plays?, max_plays?, min_duration_s?, max_duration_s?, first_played_from?, first_played_to?, last_played_from?, last_played_to?, sort?, limit?, page?)` | Tracks by play count, length and when they were first or last played. Sorts: `most_played`, `least_played`, `recently_played`, `first_played_newest`, `first_played_oldest`, `longest`, `shortest` |
 | `connect_tidal()` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes) |
