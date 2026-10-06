@@ -85,8 +85,11 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 			{
 				limit: z.number().int().min(1).max(200).optional().describe("Crates per page (default 100)"),
 				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
+				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year"),
+				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year"),
 			},
-			async ({ limit, page }) => this.run("list_crates", { limit, page }, () => listCrates(this.pb(), { limit, page })),
+			async ({ limit, page, min_year, max_year }) =>
+				this.run("list_crates", { limit, page, min_year, max_year }, () => listCrates(this.pb(), { limit, page, min_year, max_year })),
 		);
 
 		this.server.tool(
@@ -114,12 +117,15 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				"Play counts and dates come from the user's full scrobble history (back to 2006).",
 				"'First played' is the best stand-in for 'date added', since most tracks were bulk-imported on one day.",
 				"Only ~73% of tracks have a duration; duration filters skip the rest. Paginated.",
+				"min_year/max_year filter on the album's release year (or its Last.fm year tag where the year isn't filled in yet).",
 			].join(" "),
 			{
 				min_plays: z.number().int().min(0).optional().describe("At least this many plays"),
 				max_plays: z.number().int().min(0).optional().describe("At most this many plays (0 = never played)"),
 				min_duration_s: z.number().int().min(0).optional().describe("Minimum length in seconds"),
 				max_duration_s: z.number().int().min(1).optional().describe("Maximum length in seconds"),
+				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year (album's year)"),
+				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year (album's year)"),
 				first_played_from: isoDate.optional().describe("First played on or after (YYYY-MM-DD)"),
 				first_played_to: isoDate.optional().describe("First played on or before (YYYY-MM-DD)"),
 				last_played_from: isoDate.optional().describe("Last played on or after (YYYY-MM-DD)"),
