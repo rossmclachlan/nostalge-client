@@ -21,6 +21,7 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
 | `find_tracks(min_plays?, max_plays?, min_duration_s?, max_duration_s?, first_played_from?, first_played_to?, last_played_from?, last_played_to?, sort?, limit?, page?)` | Tracks by play count, length and when they were first or last played. Sorts: `most_played`, `least_played`, `recently_played`, `first_played_newest`, `first_played_oldest`, `longest`, `shortest` |
 | `connect_tidal()` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes) |
+| `random_tracks(count?, artist?, tags[]?, min_plays?, max_plays?, min_duration_s?, max_duration_s?, min_year?, max_year?)` | N random songs matching the filters. Every matching song is equally likely: songs stored as two track records aren't picked twice as often |
 | `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
 | `list_tidal_playlists(limit?)` | Your own TIDAL playlists, most recently changed first, with ids, track counts and links |
 | `get_tidal_playlist(playlist_id, offset?)` | A playlist's details and tracks with 1-based positions, 100 per call |
