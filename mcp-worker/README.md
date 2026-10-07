@@ -35,6 +35,7 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `move_tidal_playlist_tracks(playlist_id, from_positions[], to_position)` | Moves tracks (keeping their order) to before a position; track count + 1 moves them to the end. Re-reads the playlist to confirm the new order |
 | `update_tidal_playlist(playlist_id, name?, description?, visibility?)` | Renames a playlist, or changes its description or visibility (`PUBLIC` / `UNLISTED`) |
 | `delete_tidal_playlist(playlist_id, confirm_name)` | Deletes a playlist. `confirm_name` must be its exact current name |
+| `compare_artist_with_tidal(artist, tidal_artist_id?)` | One artist's releases in the library vs on TIDAL: only in the library, only on TIDAL (newest first), and in both. Editions such as "Deluxe" or "Remastered" count as the same release |
 
 **How the PocketBase schema maps to these tools.** The schema comes from the `music-cms-mvp`
 migrations. It has no `crates` or `releases` collections, so:
