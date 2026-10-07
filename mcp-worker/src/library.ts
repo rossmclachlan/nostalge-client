@@ -14,6 +14,7 @@
  */
 
 import { type PocketBase, PocketBaseError, pbString } from "./pocketbase";
+import { type YearRange, yearFilter } from "./year-filter";
 
 type Base = { id: string; created: string; updated: string };
 type TagRec = Base & { name: string; slug: string; usage_count: number };
@@ -168,8 +169,10 @@ export async function searchLibrary(pb: PocketBase, query: string, limit?: numbe
 	};
 }
 
-export async function listCrates(pb: PocketBase, opts: { limit?: number; page?: number } = {}) {
+export async function listCrates(pb: PocketBase, opts: { limit?: number; page?: number } & YearRange = {}) {
+	const years = await yearFilter(pb, opts);
 	const res = await pb.list<AlbumRec>("albums", {
+		...(years ? { filter: years } : {}),
 		sort: "-play_count",
 		expand: "artist,tag_relations",
 		perPage: clamp(opts.limit, 100, 200),
@@ -240,7 +243,7 @@ export const TRACK_SORTS = {
 	shortest: "duration_ms",
 } as const;
 
-export type FindTracksOptions = {
+export type FindTracksOptions = YearRange & {
 	min_plays?: number;
 	max_plays?: number;
 	min_duration_s?: number;
@@ -267,6 +270,8 @@ export async function findTracks(pb: PocketBase, o: FindTracksOptions) {
 	if (o.max_plays !== undefined) where.push(`play_count<=${o.max_plays}`);
 	if (o.min_duration_s !== undefined || o.max_duration_s !== undefined) where.push("duration_ms>0");
 	if (o.min_duration_s !== undefined) where.push(`duration_ms>=${o.min_duration_s * 1000}`);
+	const years = await yearFilter(pb, o, "album.");
+	if (years) where.push(years);
 	if (o.max_duration_s !== undefined) where.push(`duration_ms<=${o.max_duration_s * 1000}`);
 	for (const [field, from, to] of [
 		["first_played_at", o.first_played_from, o.first_played_to],
