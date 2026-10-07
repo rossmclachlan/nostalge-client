@@ -7,6 +7,7 @@ import { z } from "zod";
 import { GitHubHandler } from "./github-handler";
 import { findTracks, getCrate, listCrates, releasesByTag, searchLibrary, TRACK_SORTS } from "./library";
 import { createTidalPlaylist } from "./playlist";
+import { randomTracks } from "./random";
 import { PocketBase } from "./pocketbase";
 import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
 import {
@@ -186,6 +187,23 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
 			},
 			async (opts) => this.run("find_tracks", opts, () => findTracks(this.pb(), opts)),
+		);
+
+		this.server.tool(
+			"random_tracks",
+			"Pick N random songs from the library, optionally by artist, tags (any), play count, length or release year. Every matching song is equally likely (duplicate track records are accounted for). Use it instead of fetching everything and choosing.",
+			{
+				count: z.number().int().min(1).max(50).optional().describe("How many songs (default 10)"),
+				artist: z.string().min(1).max(200).optional().describe("Artist name (case-insensitive) or id"),
+				tags: z.array(z.string().min(1).max(100)).max(10).optional().describe("Songs whose release or artist has any of these tags"),
+				min_plays: z.number().int().min(0).optional().describe("At least this many plays"),
+				max_plays: z.number().int().min(0).optional().describe("At most this many plays (0 = never played)"),
+				min_duration_s: z.number().int().min(0).optional().describe("Minimum length in seconds"),
+				max_duration_s: z.number().int().min(1).optional().describe("Maximum length in seconds"),
+				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year"),
+				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year"),
+			},
+			async (opts) => this.run("random_tracks", opts, () => randomTracks(this.pb(), opts)),
 		);
 
 		this.server.tool(
