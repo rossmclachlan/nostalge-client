@@ -46,13 +46,52 @@ type TrackRec = Base & {
 
 const clamp = (n: number | undefined, def: number, max: number) => Math.max(1, Math.min(n ?? def, max));
 
+/**
+ * Release years. albums.release_year is filled in by the sync service's
+ * MusicBrainz enrichment, which takes hours to reach every album. Until then
+ * a Last.fm year tag such as "1997" stands in, marked year_source "tag".
+ */
+const YEAR_TAG = /^(19|20)\d\d$/;
+const YEAR_TAG_TTL_MS = 60 * 60 * 1000;
+let yearTagCache: { at: number; byId: Map<string, number> } | null = null;
+
+/** Year tags by id, one request per hour per isolate. */
+async function yearTagsById(pb: PocketBase): Promise<Map<string, number>> {
+	if (yearTagCache && Date.now() - yearTagCache.at < YEAR_TAG_TTL_MS) return yearTagCache.byId;
+	const res = await pb.list<TagRec>("tags", {
+		filter: 'name>="1900" && name<="2099"',
+		fields: "id,name",
+		perPage: 500,
+		skipTotal: true,
+	});
+	const byId = new Map(res.items.filter((t) => YEAR_TAG.test(t.name)).map((t) => [t.id, Number(t.name)]));
+	yearTagCache = { at: Date.now(), byId };
+	return byId;
+}
+
+type YearSource = { release_year?: number; tag_relations?: string[]; expand?: { tag_relations?: TagRec[] } };
+
+function albumYear(a: YearSource | undefined, byId?: Map<string, number>): { release_year: number | null; year_source?: "tag" } {
+	if (a?.release_year) return { release_year: a.release_year };
+	const fromNames = (a?.expand?.tag_relations ?? []).map((t) => t.name).find((n) => YEAR_TAG.test(n));
+	if (fromNames) return { release_year: Number(fromNames), year_source: "tag" };
+	const fromIds = byId ? (a?.tag_relations ?? []).map((id) => byId.get(id)).find((y) => y !== undefined) : undefined;
+	return fromIds ? { release_year: fromIds, year_source: "tag" } : { release_year: null };
+}
+
+/** track(), plus the year of the track's release. */
+async function tracksWithYears(pb: PocketBase): Promise<(t: TrackRec) => ReturnType<typeof track> & ReturnType<typeof albumYear>> {
+	const byId = await yearTagsById(pb);
+	return (t) => ({ ...track(t), ...albumYear(t.expand?.album, byId) });
+}
+
 function release(a: AlbumRec) {
 	return {
 		id: a.id,
 		title: a.title,
 		artist: a.expand?.artist?.name ?? null,
 		artist_id: a.artist || null,
-		release_year: a.release_year || null,
+		...albumYear(a),
 		play_count: a.play_count ?? 0,
 		track_count: a.track_count ?? 0,
 		tags: (a.expand?.tag_relations ?? []).map((t) => t.name),
@@ -125,7 +164,7 @@ export async function searchLibrary(pb: PocketBase, query: string, limit?: numbe
 			.sort((a, b) => (b.play_count ?? 0) - (a.play_count ?? 0))
 			.slice(0, perPage)
 			.map(release),
-		tracks: tracks.items.map(track),
+		tracks: tracks.items.map(await tracksWithYears(pb)),
 	};
 }
 
@@ -163,7 +202,7 @@ export async function getCrate(pb: PocketBase, crateId: string) {
 	return {
 		...release(album),
 		wiki_summary: album.wiki_summary || null,
-		tracks: tracks.items.map(track),
+		tracks: tracks.items.map(await tracksWithYears(pb)),
 	};
 }
 
@@ -251,5 +290,5 @@ export async function findTracks(pb: PocketBase, o: FindTracksOptions) {
 		perPage: clamp(o.limit, 25, 100),
 		page: Math.max(1, o.page ?? 1),
 	});
-	return { page: res.page, total_pages: res.totalPages, total: res.totalItems, sort, tracks: res.items.map(track) };
+	return { page: res.page, total_pages: res.totalPages, total: res.totalItems, sort, tracks: res.items.map(await tracksWithYears(pb)) };
 }

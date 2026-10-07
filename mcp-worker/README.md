@@ -37,6 +37,9 @@ migrations. It has no `crates` or `releases` collections, so:
 - A **crate** is an album, matching the app's Crates tab.
 - A **release** is that same album.
 - Tags come from the albums' `tag_relations`.
+- **Years.** Every release and every track result carries `release_year`. It comes from
+  `albums.release_year`, which the sync service's MusicBrainz enrichment fills in. Until it reaches
+  an album, a Last.fm year tag such as "1997" stands in and the result says `year_source: "tag"`.
 - A track's `play_count`, `first_played_at` and `last_played_at` are derived from scrobbles by
   music-cms (migration 013 and the sync service). "First played" stands in for "date added",
   since most tracks were created by one bulk import.
