@@ -2,6 +2,7 @@ import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { getArtist } from "./artist";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
+import { artistsByTag, listTags, TAG_TRACK_SORTS, tracksByTag } from "./tags";
 import { z } from "zod";
 import { GitHubHandler } from "./github-handler";
 import { findTracks, getCrate, listCrates, releasesByTag, searchLibrary, TRACK_SORTS } from "./library";
@@ -119,6 +120,41 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				limit: z.number().int().min(1).max(200).optional().describe("Max releases (default 50)"),
 			},
 			async ({ tag, limit }) => this.run("releases_by_tag", { tag, limit }, () => releasesByTag(this.pb(), tag, limit)),
+		);
+
+		this.server.tool(
+			"list_tags",
+			"List the genre/mood/era tags in the library, most used first, optionally filtered by text. Year tags (e.g. 1997) are left out unless include_years is true.",
+			{
+				query: z.string().max(100).optional().describe("Only tags containing this text"),
+				include_years: z.boolean().optional().describe("Include year tags such as 1997 (default false)"),
+				limit: z.number().int().min(1).max(500).optional().describe("Max tags (default 200)"),
+			},
+			async ({ query, include_years, limit }) =>
+				this.run("list_tags", { query, include_years, limit }, () => listTags(this.pb(), { query, include_years, limit })),
+		);
+
+		this.server.tool(
+			"artists_by_tag",
+			"List artists carrying a tag (e.g. 'shoegaze'), most played first. Tag names are case-insensitive.",
+			{
+				tag: z.string().min(1).max(100).describe("Tag name"),
+				limit: z.number().int().min(1).max(200).optional().describe("Max artists (default 50)"),
+			},
+			async ({ tag, limit }) => this.run("artists_by_tag", { tag, limit }, () => artistsByTag(this.pb(), tag, limit)),
+		);
+
+		this.server.tool(
+			"tracks_by_tag",
+			"Find tracks whose release or artist carries the given tags: any of them (default) or all of them. Tag names are case-insensitive. Paginated; has_more says whether there's another page.",
+			{
+				tags: z.array(z.string().min(1).max(100)).min(1).max(10).describe("Tag names"),
+				match_all: z.boolean().optional().describe("true: every tag must match; false (default): any tag"),
+				sort: z.enum(Object.keys(TAG_TRACK_SORTS) as [keyof typeof TAG_TRACK_SORTS, ...(keyof typeof TAG_TRACK_SORTS)[]]).optional().describe("most_played (default), recently_played or least_played"),
+				limit: z.number().int().min(1).max(100).optional().describe("Tracks per page (default 25)"),
+				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
+			},
+			async (opts) => this.run("tracks_by_tag", opts, () => tracksByTag(this.pb(), opts)),
 		);
 
 		const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");

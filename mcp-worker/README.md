@@ -17,6 +17,7 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 |---|---|
 | `search_library(query, limit?)` | Artists, releases (albums) and tracks whose names match |
 | `list_crates(limit?, page?)` | Crates, most played first, with artist, year and tags |
+| `list_tags(query?, include_years?, limit?)` / `artists_by_tag(tag, limit?)` / `tracks_by_tag(tags[], match_all?, sort?, limit?, page?)` | All tags, most used first; artists with a tag; tracks whose release or artist carries any (or all) of the tags |
 | `get_crate(crateId)` | One crate with artist, tags, notes and its tracklist |
 | `get_artist(artist, include_tracks?)` | One artist's whole catalogue: every release (year, tags, plays) and every track with play stats. Duplicate track records are merged so each song appears once |
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
