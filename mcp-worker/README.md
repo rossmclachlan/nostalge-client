@@ -25,6 +25,7 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `connect_tidal()` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes) |
 | `random_tracks(count?, artist?, tags[]?, min_plays?, max_plays?, min_duration_s?, max_duration_s?, min_year?, max_year?)` | N random songs matching the filters. Every matching song is equally likely: songs stored as two track records aren't picked twice as often |
 | `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
+| `search_tidal(query, types[]?, limit?)` | Searches TIDAL's catalogue for tracks, albums and artists, including music you don't own. Each result says `in_library` (with `library_id`): tracks by a saved match or same title and artist, albums and artists by name |
 | `list_tidal_playlists(limit?)` | Your own TIDAL playlists, most recently changed first, with ids, track counts and links |
 | `get_tidal_playlist(playlist_id, offset?)` | A playlist's details and tracks with 1-based positions, 100 per call |
 | `add_to_tidal_playlist(playlist_id, track_ids[] or tidal_track_ids[], position?, dry_run?)` | Adds library tracks (matched like `create_tidal_playlist`) or TIDAL track ids, appended or inserted before a position. Skips tracks already there. `dry_run` defaults to `true` |

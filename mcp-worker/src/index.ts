@@ -10,6 +10,7 @@ import { createTidalPlaylist } from "./playlist";
 import { randomTracks } from "./random";
 import { PocketBase } from "./pocketbase";
 import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
+import { SEARCH_TYPES, searchTidal } from "./tidal-search";
 import {
 	addToTidalPlaylist,
 	deleteTidalPlaylist,
@@ -220,6 +221,21 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 							? "TIDAL is already connected. Only open the link to switch accounts or reconnect."
 							: "Ask the user to open login_link, sign in to TIDAL and approve access, then try again.",
 					};
+				}),
+		);
+
+		this.server.tool(
+			"search_tidal",
+			"Search TIDAL's catalogue for tracks, albums and artists, including music not in the library. Each result says whether the library already has it (in_library, with library_id). Use it to find new music or to get TIDAL track ids for add_to_tidal_playlist.",
+			{
+				query: z.string().min(1).max(200).describe("What to search for"),
+				types: z.array(z.enum(SEARCH_TYPES)).min(1).max(3).optional().describe("Which kinds of result (default all three)"),
+				limit: z.number().int().min(1).max(20).optional().describe("Max results per kind (default 10)"),
+			},
+			async ({ query, types, limit }) =>
+				this.run("search_tidal", { query, types, limit }, () => {
+					const budget = this.budget();
+					return searchTidal({ tidal: new Tidal(this.env, budget), pb: this.pb(budget.fetch) }, { query, types, limit });
 				}),
 		);
 

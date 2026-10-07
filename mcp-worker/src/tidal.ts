@@ -197,13 +197,13 @@ export async function connectionStatus(env: TidalEnv): Promise<{ connected: bool
 
 // -- API client --------------------------------------------------------------------
 
-type Resource = {
+export type Resource = {
 	id: string;
 	type: string;
 	attributes?: Record<string, unknown>;
 	relationships?: Record<string, { data?: { id: string; type: string }[] | { id: string; type: string } | null }>;
 };
-type Doc = {
+export type Doc = {
 	data?: Resource | Resource[];
 	included?: Resource[];
 	meta?: Record<string, unknown>;
@@ -265,7 +265,7 @@ export function isoSeconds(d: unknown): number | null {
 	return Math.round(Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0));
 }
 
-const asList = <T>(x: T | T[] | null | undefined): T[] => (x == null ? [] : Array.isArray(x) ? x : [x]);
+export const asList = <T>(x: T | T[] | null | undefined): T[] => (x == null ? [] : Array.isArray(x) ? x : [x]);
 
 export class Tidal {
 	private session: Session | null = null;
@@ -297,7 +297,8 @@ export class Tidal {
 		await saveSession(this.env, this.session);
 	}
 
-	private async request(
+	/** One API call with token refresh and retries; also used by the tidal-*.ts tool modules. */
+	async request(
 		method: "GET" | "POST" | "PATCH" | "DELETE",
 		path: string,
 		opts: { query?: [string, string][]; body?: unknown; idempotencyKey?: string } = {},
