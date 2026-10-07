@@ -1,4 +1,5 @@
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import { getArtist } from "./artist";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
@@ -94,6 +95,17 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"Get one crate (album/release) with its artist, tags, notes and tracklist.",
 			{ crateId: z.string().min(1).describe("Crate id from list_crates or search_library") },
 			async ({ crateId }) => this.run("get_crate", { crateId }, () => getCrate(this.pb(), crateId)),
+		);
+
+		this.server.tool(
+			"get_artist",
+			"Get one artist's full catalogue: every release (with year and tags) and every track with play stats, duplicates merged so each song appears once. Use it to pick a random song by an artist or to see what of theirs is in the library.",
+			{
+				artist: z.string().min(1).max(200).describe("Artist name (case-insensitive) or artist id"),
+				include_tracks: z.boolean().optional().describe("false: releases only, without tracklists (default true)"),
+			},
+			async ({ artist, include_tracks }) =>
+				this.run("get_artist", { artist, include_tracks }, () => getArtist(this.pb(), artist, { include_tracks })),
 		);
 
 		this.server.tool(
