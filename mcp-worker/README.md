@@ -27,6 +27,8 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
 | `search_tidal(query, types[]?, limit?)` | Searches TIDAL's catalogue for tracks, albums and artists, including music you don't own. Each result says `in_library` (with `library_id`): tracks by a saved match or same title and artist, albums and artists by name |
 | `list_tidal_playlists(limit?)` | Your own TIDAL playlists, most recently changed first, with ids, track counts and links |
+| `list_tidal_favourites(kind, limit?)` / `add_tidal_favourites(kind, tidal_ids[])` / `remove_tidal_favourites(kind, tidal_ids[])` | Your TIDAL favourite tracks, albums or artists: list (newest first), add, remove. Needs the newer TIDAL permissions (see below) |
+| `get_tidal_recommendations()` / `similar_tidal_artists(artist, limit?)` | TIDAL's daily, discovery and new-release mixes for you; artists similar to one artist, marked `in_library` or not |
 | `get_tidal_playlist(playlist_id, offset?)` | A playlist's details and tracks with 1-based positions, 100 per call |
 | `add_to_tidal_playlist(playlist_id, track_ids[] or tidal_track_ids[], position?, dry_run?)` | Adds library tracks (matched like `create_tidal_playlist`) or TIDAL track ids, appended or inserted before a position. Skips tracks already there. `dry_run` defaults to `true` |
 | `remove_from_tidal_playlist(playlist_id, positions[]?, tidal_track_ids[]?)` | Removes tracks by position, and/or every occurrence of given TIDAL ids |
@@ -241,6 +243,17 @@ allows 10,000, and most playlists then finish in one call.
 - Both writes send an `Idempotency-Key`, and progress is saved after each batch, so retries
   never duplicate the playlist or its tracks.
 - Calling again with `dry_run=false` and the same name returns the existing playlist.
+
+## TIDAL permissions
+
+The Worker asks TIDAL for `playlists.read playlists.write search.read user.read collection.read
+collection.write recommendations.read`. The last three (favourites and recommendations) were added
+later. A connection made before then lacks them:
+- `connect_tidal` lists them under `missing_permissions`;
+- the favourites and recommendation tools answer with a "reconnect" message.
+
+Open the link from `connect_tidal` and approve once more to add them. The TIDAL app at
+developer.tidal.com must allow these scopes too.
 
 ## Editing TIDAL playlists
 
