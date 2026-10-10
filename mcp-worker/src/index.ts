@@ -21,6 +21,7 @@ import {
 	updateTidalPlaylist,
 } from "./tidal-playlists";
 import { compareArtistWithTidal } from "./tidal-compare";
+import { probeTidalPlayback } from "./tidal-playback-probe";
 import type { Props } from "./utils";
 import {
 	changeTidalFavourites,
@@ -218,13 +219,19 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 		this.server.tool(
 			"connect_tidal",
 			"Check whether TIDAL is connected, and get a one-time link (valid 10 minutes) for the user to open in a browser and sign in to TIDAL. Needed once before create_tidal_playlist, and again if TIDAL access is revoked.",
-			{},
-			async () =>
-				this.run("connect_tidal", {}, async () => {
+			{
+				extra_scopes: z
+					.array(z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/))
+					.max(5)
+					.optional()
+					.describe("Experimental: extra TIDAL permission names to request (e.g. one reported by probe_tidal_playback). Omit normally."),
+			},
+			async ({ extra_scopes }) =>
+				this.run("connect_tidal", { extra_scopes }, async () => {
 					const status = await connectionStatus(this.env);
 					return {
 						...status,
-						login_link: await startLogin(this.env),
+						login_link: await startLogin(this.env, extra_scopes ?? []),
 						message: status.connected
 							? status.missing_permissions
 								? `TIDAL is connected, but without ${status.missing_permissions.join(", ")} (favourites and recommendations). Ask the user to open login_link and approve again to add them.`
@@ -272,6 +279,13 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 						{ pb: this.pb(budget.fetch), tidal: new Tidal(this.env, budget), budget, storage: this.ctx.storage },
 					);
 				}),
+		);
+
+		this.server.tool(
+			"probe_tidal_playback",
+			"Experimental, read-only: check whether TIDAL lets this server see playback (play/pause state, the user's TIDAL devices and play queue), and list TIDAL's playback-related permissions. Changes nothing. Report the raw result to the user.",
+			{},
+			async () => this.run("probe_tidal_playback", {}, () => probeTidalPlayback(new Tidal(this.env, this.budget()))),
 		);
 
 		// -- TIDAL favourites, recommendations and similar artists ------------------------

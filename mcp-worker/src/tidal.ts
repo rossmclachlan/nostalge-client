@@ -114,7 +114,7 @@ function requireClientId(env: TidalEnv): string {
 // -- one-time login -----------------------------------------------------------------
 
 /** A single-use TIDAL authorize link, valid for 10 minutes. */
-export async function startLogin(env: TidalEnv): Promise<string> {
+export async function startLogin(env: TidalEnv, extraScopes: string[] = []): Promise<string> {
 	const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
 	const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 	const state = b64url(crypto.getRandomValues(new Uint8Array(32)));
@@ -125,7 +125,7 @@ export async function startLogin(env: TidalEnv): Promise<string> {
 		response_type: "code",
 		client_id: requireClientId(env),
 		redirect_uri: redirectUri(env),
-		scope: SCOPES,
+		scope: [SCOPES, ...extraScopes].join(" "),
 		code_challenge_method: "S256",
 		code_challenge: challenge,
 		state,
@@ -197,13 +197,13 @@ export async function finishLogin(env: TidalEnv, url: URL): Promise<Session> {
 
 export async function connectionStatus(
 	env: TidalEnv,
-): Promise<{ connected: boolean; country?: string; missing_permissions?: string[] }> {
+): Promise<{ connected: boolean; country?: string; granted?: string; missing_permissions?: string[] }> {
 	const s = await loadSession(env);
 	if (!s) return { connected: false };
 	// Sessions saved before scopes were recorded may predate favourites/recommendations access.
 	const granted = new Set((s.scope ?? "playlists.read playlists.write search.read user.read").split(/\s+/));
 	const missing = SCOPES.split(" ").filter((x) => !granted.has(x));
-	return { connected: true, country: s.country || undefined, ...(missing.length ? { missing_permissions: missing } : {}) };
+	return { connected: true, country: s.country || undefined, granted: s.scope, ...(missing.length ? { missing_permissions: missing } : {}) };
 }
 
 // -- API client --------------------------------------------------------------------
@@ -312,12 +312,12 @@ export class Tidal {
 	async request(
 		method: "GET" | "POST" | "PATCH" | "DELETE",
 		path: string,
-		opts: { query?: [string, string][]; body?: unknown; idempotencyKey?: string } = {},
+		opts: { query?: [string, string][]; body?: unknown; idempotencyKey?: string; country?: boolean } = {},
 	): Promise<Doc> {
 		await this.connect();
 		const url = new URL(API + path);
 		for (const [k, v] of opts.query ?? []) url.searchParams.append(k, v);
-		if (this.session!.country) url.searchParams.set("countryCode", this.session!.country);
+		if (this.session!.country && opts.country !== false) url.searchParams.set("countryCode", this.session!.country);
 
 		let refreshed = false;
 		for (let attempt = 1; ; attempt++) {
