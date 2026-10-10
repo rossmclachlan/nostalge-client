@@ -285,7 +285,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"probe_tidal_playback",
 			"Experimental, read-only: check whether TIDAL lets this server see playback (play/pause state, the user's TIDAL devices and play queue), and list TIDAL's playback-related permissions. Changes nothing. Report the raw result to the user.",
 			{},
-			async () => this.run("probe_tidal_playback", {}, () => probeTidalPlayback(new Tidal(this.env, this.budget()))),
+			async () => this.run("probe_tidal_playback", {}, async () => probeTidalPlayback(new Tidal(this.env, this.budget()), (await connectionStatus(this.env)).granted)),
 		);
 
 		// -- TIDAL favourites, recommendations and similar artists ------------------------
