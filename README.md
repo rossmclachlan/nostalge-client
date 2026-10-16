@@ -15,7 +15,7 @@ Built with **Astro** (static output) + **React islands**, **TypeScript**, and
 > For a technical deep-dive (data flow, modules, discovery engine, theming,
 > PWA, deploy), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
-## The four tabs
+## The three tabs
 
 Organised by what you actually want at the moment you open the app:
 
@@ -25,47 +25,12 @@ Organised by what you actually want at the moment you open the app:
 - **Library** — *find something specific.* Two indexes into the same shelf:
   **Crates** (every album as a card, searchable client-side) and **Tags** (the
   collection sorted by genre / mood / era, as handwritten divider cards).
-- **Sets** — *ask for a playlist in words.* See below.
 - **History** — *look back.* The same facts at two zoom levels: **Recent** (the raw
   scrobble feed plus sync status) and **Stats** (top artists, top albums, busiest
   month).
 
 Library and History switch between their two views with a small segmented control at
 the top of the tab.
-
-## Sets — playlists in plain language
-
-Type *"something quiet I haven't played in years"* and get a sequenced tracklist with a
-liner note explaining why those records, together, now.
-
-It runs in three stages, and the middle one is ordinary code:
-
-1. **Plan** — the model turns the sentence into a *query* over the collection (tags, play
-   counts, recency, era).
-2. **Dig** — that query runs locally against the cached library.
-3. **Sequence** — the model orders the real tracks it was handed and writes the note.
-
-The model never names a track from memory: it can only choose from what step 2 found, and
-anything else is discarded. **Every track in a playlist is a record you own.**
-
-The taste is built in — sequencing arc, no more than a couple of tracks per artist, deep
-cuts over singles, and a bias toward records that have been sitting on the shelf. You don't
-have to prompt well to get something good.
-
-### Setting it up
-
-Making a playlist calls the Gemini API, so it needs a key. There is no server here to
-hold one, so the key stays in your own browser (`localStorage`) and goes straight to
-Google. The Sets tab asks for it once.
-
-The key comes from [aistudio.google.com](https://aistudio.google.com/apikey) and is an
-**API key** — billed separately from any Gemini subscription, which doesn't grant API
-access. Expect roughly **2¢ per playlist** on `gemini-3.7-flash`: about 10k input tokens
-plus 2–7k output, at its introductory $0.75/$3.75 per million (rising to $1.50/$7.50 on
-1 January 2027).
-
-Saved playlists live in `localStorage` and open offline — only *building* one needs the
-network. The rest of the app is unaffected if you never set a key.
 
 ## Claude connector (MCP server)
 
@@ -163,11 +128,9 @@ src/
 │   ├── App.tsx        # root island: tabs + navigation stack
 │   ├── crates/        # Crates tab, artist & album detail
 │   ├── discovery/     # Forgotten Gems / Blind Spot
-│   ├── playlists/     # Sets tab: prompt, build panel, playlist detail
 │   ├── tags/          # tag index + tag detail
 │   └── stats/         # listening stats
 ├── lib/               # data layer: pb, cache, useLibrary, derive, format
-│   └── playlist/      # plan -> execute -> curate, and the taste instructions
 ├── layouts/Layout.astro
 ├── pages/index.astro  # mounts the App island
 └── styles/global.css  # zine/record-store design tokens

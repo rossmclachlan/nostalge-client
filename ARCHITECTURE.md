@@ -10,8 +10,6 @@ Live: `https://rossmclachlan.github.io/nostalge-client/`
 - **TypeScript** (strict), path alias `@/* → src/*`.
 - **Tailwind CSS v4** via `@tailwindcss/vite` (no `tailwind.config.js`; design tokens live in CSS `@theme`).
 - **PocketBase JS SDK** `0.21.5` (pinned).
-- **@google/genai** — playlist builder only, **dynamically imported** so it stays
-  out of the app shell (see Playlist builder below).
 - **@vite-pwa/astro** (Workbox) for the installable PWA + offline app shell.
 - No test suite, no linter config, no `tailwind.config.js`, no `CLAUDE.md`.
 
@@ -41,22 +39,10 @@ src/
     discovery/
       engine.ts              Card model, EngineCtx builder, seeded weighted selection, shown-tracking
       cards.ts               32 card generators (22 active, 10 dormant); GENERATORS array
-    playlist/
-      taste.ts               PLANNER_TASTE / CURATOR_TASTE — the shipped curatorial opinions
-      types.ts               PlaylistPlan, Candidate, Playlist, RunStage, RunFailure
-      schema.ts              JSON Schemas for the two structured-output calls
-      normalise.ts           Coerce/clamp model output into trustworthy shapes
-      gemini.ts              Key storage, lazy SDK import, the single API call. Never throws.
-      digest.ts              Compact collection portrait for the planner (the cached prefix)
-      plan.ts                Stage 1 — prompt -> PlaylistPlan
-      execute.ts             Stage 2 — PlaylistPlan + MusicData -> Candidate[]. PURE, no network.
-      curate.ts              Stage 3 — candidates -> sequenced playlist; enforces the ref guarantee
-      run.ts                 usePlaylistRun() — orchestrates the three stages
-      store.ts               localStorage for saved playlists
 
   components/
     App.tsx                  Root island: tab state, detail navigation stack, discoverySeed, Masthead
-    BottomNav.tsx            Fixed 4-tab bottom nav (Tab type + ITEMS)
+    BottomNav.tsx            Fixed 3-tab bottom nav (Tab type + ITEMS)
     Cover.tsx                Album/artist artwork with generated initials fallback + aged overlay
     SignIn.tsx               SignInGate (email/password card shown when a sync needs a session) + SignedInAs (sign-out link)
     ThemeToggle.tsx          Light/dark flip (writes `nostalge:theme`, updates theme-color meta)
@@ -66,8 +52,6 @@ src/
     ui.tsx                   Shared primitives: SectionHeader, Chip, PlayBadge, SegmentedControl, EmptyState
     icons.tsx                Inline SVG icon set
     crates/  CratesTab.tsx (album grid + search), AlbumDetail.tsx, ArtistDetail.tsx
-    playlists/ PlaylistsTab.tsx (prompt + shelf), RunPanel.tsx (the build, made visible),
-               PlaylistDetail.tsx, KeyGate.tsx (API key entry)
     discovery/ DiscoveryTab.tsx (runs engine, renders cards, shuffle), DiscoveryCard.tsx
     tags/    TagsTab.tsx (divider-card index), TagDetail.tsx (albums shuffleable + artists)
     stats/   StatsTab.tsx (headline figures + top lists)
@@ -105,13 +89,13 @@ Local cache shapes:
 - **`useRecentPlays()`** — same pattern with its own cache key and its own `needsSignIn`; also manual-refresh only. The Recent tab's status panel shows "signed in as … · sign out" (`SignedInAs`). Signing out keeps the cached library on the device.
 
 ### localStorage keys
-`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:playlists:v1` (saved playlists, newest first, capped at 50) · `nostalge:gemini-key:v1` (the user's own API key) · `nostalge:theme` (`light`/`dark`) · `pocketbase_auth` (the SDK's session token, written by the SDK itself).
+`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:theme` (`light`/`dark`) · `pocketbase_auth` (the SDK's session token, written by the SDK itself).
 
 ## UI / navigation (`src/components/App.tsx`)
-- **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | library | playlists | history`. Bottom-nav order: **Discover, Library, Sets, History**. Default tab: **discovery**. The grid is `grid-cols-4`.
-- **The nav is organised by intent, not by data source.** Discover = be told what to play; Library = find something specific; Sets = ask for a playlist in words; History = look back. Crates and Tags are two indexes into the same shelf, so they share the Library tab; Recent and Stats are the same facts at two zoom levels, so they share History. Both pairs are chosen with a `SegmentedControl` at the top of the tab body.
+- **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | library | history`. Bottom-nav order: **Discover, Library, History**. Default tab: **discovery**. The grid is `grid-cols-3`. (A fourth tab, Sets, built playlists from a sentence via the Gemini API; it was removed because the Claude connector in `mcp-worker/` does that job now. App.tsx clears the localStorage keys it left behind.)
+- **The nav is organised by intent, not by data source.** Discover = be told what to play; Library = find something specific; History = look back. Crates and Tags are two indexes into the same shelf, so they share the Library tab; Recent and Stats are the same facts at two zoom levels, so they share History. Both pairs are chosen with a `SegmentedControl` at the top of the tab body.
 - **Section state lives in `App`, not in the tab components** (`librarySection`, `historySection`) — same reasoning as `discoverySeed`. A tab body unmounts when a detail is pushed, so state held inside it would be lost: drilling into an album from Tags and pressing Back would silently drop you on Crates. Switching section also scrolls to top, because it is a navigation.
-- **Navigation stack**: `stack: Detail[]`, `Detail = { kind: 'artist'|'album'|'tag'|'playlist'; id }`. When `stack` is non-empty, App renders the matching detail view (in a `max-w-2xl` readable column) instead of the tab body; `back` pops. `changeTab` clears the stack, sets the tab, re-rolls the discovery seed when entering Discovery, scrolls to top.
+- **Navigation stack**: `stack: Detail[]`, `Detail = { kind: 'artist'|'album'|'tag'; id }`. When `stack` is non-empty, App renders the matching detail view (in a `max-w-2xl` readable column) instead of the tab body; `back` pops. `changeTab` clears the stack, sets the tab, re-rolls the discovery seed when entering Discovery, scrolls to top.
 - **`discoverySeed`** lives in `App` (not in `DiscoveryTab`) so the Discovery selection **survives drilling into a detail and pressing Back**; it re-rolls only on deliberate tab entry or Shuffle.
 - **Masthead**: "Nostalge" kicker + tab title, a `ConnectionFlag` (syncing / live / "off the shelf" / "no signal"), plus `InstallButton`, `ThemeToggle`, and a spin-while-syncing Refresh button.
 - **Responsive**: full-width container; grids scale 2 → sm:3 → md/lg:4–5 → xl:6 columns; detail pages capped at `max-w-2xl`.
@@ -127,77 +111,6 @@ The Discovery tab is a **data engine kept separate from the UI**.
 
 > **Highest-value data-layer extension:** caching track-level plays would unlock the 4 per-track cards without any backend schema change. Country/year/duration/loved need new backend fields.
 
-## Playlist builder (`src/lib/playlist/`)
-
-The Sets tab turns a sentence ("something quiet I haven't played in years") into a
-tracklist drawn from the collection. It runs in **three stages with a deterministic
-middle**:
-
-```
-prompt ─▶ [model: PLAN] ─▶ PlaylistPlan ─▶ [execute.ts] ─▶ Candidate[] ─▶ [model: CURATE] ─▶ Playlist
-```
-
-**The model never names a track from memory.** Stage 1 emits a *query*; `execute.ts`
-runs that query against the cached library; stage 3 may only pick from the rows
-`execute.ts` produced, and `curate.ts` drops any ref that wasn't offered. Every track in
-every playlist provably exists in the collection. The plan's `max_per_artist` /
-`max_per_album` are enforced on acceptance too, so a playlist can't violate its own brief.
-
-- **`execute.ts` is pure** — no network, no clock, no localStorage (`now` and `seed` are
-  arguments). It reuses `buildContext()` from the discovery engine, so the collection-wide
-  exclusions apply for free. It is the half worth testing, and it needs no API key.
-- **It runs off the cache.** `MusicData.tracks` already carries per-track play counts, so
-  building needs no PocketBase call — only generativelanguage.googleapis.com. Saved playlists open fully
-  offline.
-- **Candidate selection is round-robin by album**, so one record can't eat an artist's
-  whole allowance and the curator keeps a real choice of *which* track from a record.
-- **`taste.ts` is the point.** `PLANNER_TASTE` covers how to read a request (mood over
-  genre, over-fetch, lean toward neglect because this is a rediscovery app); `CURATOR_TASTE`
-  covers sequencing arc, the familiar/forgotten mix, deep cuts, and the voice of the liner
-  note. Tune these first — no logic changes needed.
-- **Honest filters only.** The plan schema can only express what the data knows: tags, play
-  counts, scrobble recency and hour, release year *as a Last.fm year tag*. It cannot express
-  tempo, key, energy, duration, country, or "loved" — the same gaps that keep 10 discovery
-  generators dormant. The planner prompt names them so the model doesn't emit a filter
-  `execute.ts` would silently ignore.
-
-### The API key
-There is no server, so the key is the user's own, in their own browser
-(`nostalge:gemini-key:v1`), sent straight to Google. The `@google/genai` SDK ships a
-browser build via its `browser` export condition, so no opt-in flag is needed and the
-node-only dependencies (google-auth-library, protobufjs) never reach the bundle.
-**`gemini.ts` is the only file that talks to the API**: to move the key server-side later
-(a Worker, or a route on the NAS behind Tailscale), repoint that file and change nothing
-else. A stale `nostalge:anthropic-key:v1` from the previous provider is deleted on load.
-
-### Cost and caching
-The system prompt (taste + digest) is marked `cache_control: ephemeral` and only changes
-when the library re-syncs, so every later run in a session reads it back at ~0.1×. Stage 1
-runs at `medium` effort, stage 3 at `high`.
-
-Ballpark per playlist on `gemini-3.7-flash`: ~10k input tokens (≈6k planner digest + ~4.5k
-candidate table) and 2–7k output. Thinking bills as output, so the thinking level is the
-main cost lever, not the prompt size. At the introductory $0.75/$3.75 per million that is
-around 2¢; standard pricing from 1 Jan 2027 doubles it. Stage 1 runs at `low` thinking,
-stage 3 at `medium` — raise stage 3 to `high` if sequencing feels flat.
-
-### Failure
-Every stage returns a `RunFailure` value rather than throwing — `no_key`, `no_data`,
-`offline`, `refused`, `empty`, `bad_key`, `bad_model`, `rate_limited`, `busy`, `unknown` —
-and `RunPanel` renders each as a quiet card naming the thing to go and check.
-
-The values are deliberately specific. A single "something went wrong" is worse than useless
-against a black-box API behind someone else's key: it sent a real user to check a key and a
-connection that were both fine, when the actual answer was a 503 from an overloaded model.
-So `gemini.ts` classifies the SDK's `ApiError.status`, shows the API's own message under the
-card, and logs it to the console **unconditionally** — this is a static site with no server
-logs, so that console line is the only forensic trail there is.
-
-`callJson` retries 500/502/503/504 up to three attempts with jittered exponential backoff.
-A run makes two API calls, so losing the planning *and* the dig to a transient blip is a bad
-trade. **429 is deliberately not retried** — a rate limit means slow down, and retrying into
-it makes things worse.
-
 ## Theming / design system (`src/styles/global.css`)
 - **Tokens in `@theme`**: paper/ink palette (`--color-paper*`, `--color-ink*`, `--color-kraft`), riso accents (`--color-riso-red/olive/yellow/blue`), fonts (`--font-display` Bebas Neue, `--font-body` Archivo — loaded via Google Fonts in `Layout.astro`), `--radius-sticker`, `--shadow-ink`, `--nav-active-bg`.
 - **Dark mode is a token swap**, not per-component variants. A `.dark {}` block overrides those custom properties; every component consumes token colors (`bg-paper`, `text-ink`, `border-ink`, etc.), so one class flip re-themes the whole app. `--shadow-ink` and `--nav-active-bg` are themed so the hard offset shadows and the selected-tab block still read on dark. `.dark .sleeve-blend` disables the multiply blend so cover art doesn't crush to black.
@@ -207,11 +120,6 @@ it makes things worse.
 ## PWA / service worker
 - `@vite-pwa/astro` with `registerType: 'autoUpdate'`, `injectRegister: false`. Because vite-plugin-pwa's HTML injection doesn't run on Astro's generated pages, the **manifest link and SW registration are hand-wired in `Layout.astro`** (base-path aware).
 - Workbox: `skipWaiting: true` + `clientsClaim: true` (new SW takes over open pages immediately), app-shell precache, and a `cover-art` CacheFirst runtime cache for images.
-- **The model SDK is deliberately not precached.** A `manualChunks` rule in
-  `astro.config.mjs` gives it a stable `genai.*.js` name and `globIgnores` keeps it out of
-  the precache manifest — it is ~390 kB (70 kB gzipped) that only the Sets tab loads, and
-  that feature needs the network anyway. Precache stays at ~385 KiB. If you rename that
-  chunk, update the `globIgnores` pattern with it.
 - Registration script tracks `hadController` (so a fresh install doesn't reload), reloads once on `controllerchange` (new build activates without a manual hard refresh), and calls `reg.update()` on `visibilitychange`.
 - Manifest `scope`/`start_url`/`id` all pinned to `/nostalge-client/`.
 
@@ -222,7 +130,7 @@ it makes things worse.
 - After deploy, the auto-updating SW means clients pick up the new build on next open (no reinstall).
 
 ## Conventions & gotchas for the next contributor
-- **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch, and bump `grid-cols-N` to match. Four is roomy on a 390px phone. Before adding a fifth, check whether the new view is really a new *intent* or just another view of an existing one — if it's the latter it belongs behind a `SegmentedControl` in the tab that already owns that intent.
+- **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch, and bump `grid-cols-N` to match. Four is still roomy on a 390px phone. Before adding one, check whether the new view is really a new *intent* or just another view of an existing one — if it's the latter it belongs behind a `SegmentedControl` in the tab that already owns that intent.
 - **Add a discovery card**: write a `CardGenerator` in `cards.ts` returning a `DiscoveryCard | null` and add it to `GENERATORS`. Enforce "enough data" inside the generator and return `null` otherwise.
 - **New PocketBase field**: add it to the interface in `types.ts`, fetch it in `pb.ts` (respect the caps + `requestKey: null`), and it flows through the cache automatically.
 - **Colors**: only touch `@theme` and the `.dark` block; never hardcode hex in components — use token utilities so dark mode keeps working.

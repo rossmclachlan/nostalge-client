@@ -13,8 +13,6 @@ import { TagsTab } from './tags/TagsTab'
 import { TagDetail } from './tags/TagDetail'
 import { StatsTab } from './stats/StatsTab'
 import { RecentTab } from './recent/RecentTab'
-import { PlaylistsTab } from './playlists/PlaylistsTab'
-import { PlaylistDetail } from './playlists/PlaylistDetail'
 import { SegmentedControl } from './ui'
 import { SignInGate } from './SignIn'
 
@@ -22,12 +20,10 @@ type Detail =
   | { kind: 'artist'; id: string }
   | { kind: 'album'; id: string }
   | { kind: 'tag'; id: string }
-  | { kind: 'playlist'; id: string }
 
 const TAB_TITLES: Record<Tab, string> = {
   discovery: 'Discovery',
   library: 'Library',
-  playlists: 'Sets',
   history: 'History',
 }
 
@@ -46,6 +42,16 @@ const HISTORY_SECTIONS: { id: HistorySection; label: string }[] = [
 ]
 
 const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
+
+// The Sets tab is gone (playlists are built through the Claude connector now).
+// Clear what it left in the browser, the Gemini API key above all.
+try {
+  for (const k of ['nostalge:gemini-key:v1', 'nostalge:anthropic-key:v1', 'nostalge:playlists:v1']) {
+    localStorage.removeItem(k)
+  }
+} catch {
+  // Storage blocked; nothing to clean.
+}
 
 export default function App() {
   const { data, connection, syncing, needsSignIn, refresh } = useLibrary()
@@ -86,7 +92,6 @@ export default function App() {
   const openArtist = useCallback((id: string) => push({ kind: 'artist', id }), [push])
   const openAlbum = useCallback((id: string) => push({ kind: 'album', id }), [push])
   const openTag = useCallback((id: string) => push({ kind: 'tag', id }), [push])
-  const openPlaylist = useCallback((id: string) => push({ kind: 'playlist', id }), [push])
 
   const changeTab = useCallback((next: Tab) => {
     savedScroll.current = []
@@ -140,13 +145,6 @@ export default function App() {
               onOpenAlbum={openAlbum}
             />
           )}
-          {detail.kind === 'playlist' && (
-            <PlaylistDetail
-              playlistId={detail.id}
-              onBack={back}
-              onOpenAlbum={openAlbum}
-            />
-          )}
         </div>
       ) : (
         <>
@@ -181,10 +179,6 @@ export default function App() {
                 )}
                 {librarySection === 'tags' && <TagsTab data={data} onOpenTag={openTag} />}
               </>
-            )}
-
-            {tab === 'playlists' && (
-              <PlaylistsTab data={data} onOpenPlaylist={openPlaylist} />
             )}
 
             {tab === 'history' && (
