@@ -1,4 +1,5 @@
-import type { MusicData, TrackPlay } from './types'
+import { plainText } from './format'
+import type { Album, Artist, MusicData, TrackPlay } from './types'
 
 /**
  * localStorage-backed cache for the music library. This is the source of
@@ -7,6 +8,12 @@ import type { MusicData, TrackPlay } from './types'
  * Tracks are stored under their own key: there can be tens of thousands of
  * them, so if that write hits the quota it fails on its own without taking
  * the (much smaller, more important) core library down with it.
+ *
+ * Artist bios and album write-ups are cut down to plain-text excerpts before
+ * they're saved. The app only ever shows a few hundred characters of them,
+ * and stored whole they can push the core library past the browser's ~5 MB
+ * quota, which leaves nothing cached and "no signal" on every tab after a
+ * reload.
  */
 
 const KEY = 'nostalge:data:v1'
@@ -47,14 +54,37 @@ export function loadCache(): MusicData {
   }
 }
 
+/** Longest bio / write-up excerpt we keep (the UI shows at most 320). */
+const EXCERPT = 400
+
+function slimArtist(a: Artist): Artist {
+  return a.bio ? { ...a, bio: plainText(a.bio, EXCERPT) } : a
+}
+
+function slimAlbum(a: Album): Album {
+  return a.wiki_summary ? { ...a, wiki_summary: plainText(a.wiki_summary, EXCERPT) } : a
+}
+
 export function saveCache(data: MusicData): void {
   if (typeof localStorage === 'undefined') return
-  const { tracks, ...core } = data
+  const { tracks, ...rest } = data
+  const core = JSON.stringify({
+    ...rest,
+    artists: rest.artists.map(slimArtist),
+    albums: rest.albums.map(slimAlbum),
+  })
   try {
-    localStorage.setItem(KEY, JSON.stringify(core))
+    localStorage.setItem(KEY, core)
   } catch {
-    // Quota exceeded / private mode — degrade silently, the app still runs
-    // off the in-memory copy for this session.
+    // The previous sync's tracks blob may be what's using up the quota. The
+    // core library matters more, so drop the tracks and try once more.
+    try {
+      localStorage.removeItem(TRACKS_KEY)
+      localStorage.setItem(KEY, core)
+    } catch {
+      // Quota exceeded / private mode — degrade silently, the app still runs
+      // off the in-memory copy for this session.
+    }
   }
   try {
     localStorage.setItem(TRACKS_KEY, JSON.stringify(tracks ?? []))
