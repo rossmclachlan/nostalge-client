@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { hasData, loadCache, saveCache } from './cache'
 import {
   ensureSession,
@@ -33,6 +33,9 @@ interface LibraryState {
  *  - The reads need a signed-in user. If the server answers but there's no
  *    usable session, `needsSignIn` goes true and the cache stays put. Being
  *    away from home never asks for a sign-in, since it couldn't succeed.
+ *  - Signing in, from any sign-in card (including the Recent tab's), syncs
+ *    the library straight away. Otherwise signing in on the Recent tab only
+ *    pulled recent plays and every other tab stayed on "no signal".
  *
  * There is no error state by design: worst case we show an empty/welcome
  * screen.
@@ -46,7 +49,11 @@ export function useLibrary(): LibraryState {
   const [sessionRejected, setSessionRejected] = useState(false)
   const email = useAuth()
 
+  const inFlight = useRef(false)
+
   const sync = useCallback(async () => {
+    if (inFlight.current) return
+    inFlight.current = true
     setSyncing(true)
     try {
       const live = await healthCheck()
@@ -82,9 +89,17 @@ export function useLibrary(): LibraryState {
     } catch {
       // Silent — stay on whatever we already had.
     } finally {
+      inFlight.current = false
       setSyncing(false)
     }
   }, [])
+
+  // A sign-in is the user asking for data, wherever it happened.
+  const prevEmail = useRef(email)
+  useEffect(() => {
+    if (email !== '' && prevEmail.current === '') void sync()
+    prevEmail.current = email
+  }, [email, sync])
 
   const refresh = useCallback(() => {
     void sync()
