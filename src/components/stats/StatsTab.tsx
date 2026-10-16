@@ -56,7 +56,7 @@ export function StatsTab({
                   <span className="font-display w-9 shrink-0 text-3xl leading-none text-riso-red">
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-display text-2xl uppercase leading-none text-ink">
+                  <span className="min-w-0 flex-1 truncate font-display text-2xl italic leading-tight text-ink">
                     {a.name}
                   </span>
                   <span className="label text-ink-3 shrink-0">
@@ -84,7 +84,7 @@ export function StatsTab({
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-display text-xl uppercase leading-none text-ink">
+                    <span className="block truncate font-display text-xl italic leading-tight text-ink">
                       {a.title}
                     </span>
                     <span className="label text-ink-3 truncate">{a.artistName}</span>
@@ -116,14 +116,14 @@ function BigStat({
   tone: 'red' | 'olive' | 'yellow' | 'ink'
 }) {
   const tones = {
-    red: 'bg-riso-red text-paper',
-    olive: 'bg-riso-olive text-paper',
-    yellow: 'bg-riso-yellow text-ink',
-    ink: 'bg-ink text-paper',
+    red: 'bg-indigo text-paper-2',
+    olive: 'bg-lavender text-ink',
+    yellow: 'bg-sun text-ink',
+    ink: 'bg-ink text-paper-2',
   }
   return (
-    <div className={`flyer aged ${tones[tone]} px-3 py-4`}>
-      <p className="font-display text-5xl leading-none">{value}</p>
+    <div className={`rounded-2xl ${tones[tone]} px-3 py-4`}>
+      <p className="font-display text-4xl font-semibold italic leading-none">{value}</p>
       <p className="label mt-2 opacity-80">{label}</p>
     </div>
   )

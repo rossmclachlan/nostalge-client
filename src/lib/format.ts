@@ -22,14 +22,14 @@ export function initials(name: string): string {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase()
 }
 
-/* A small riso-ish palette for generated placeholders. */
+/* Placeholder sleeves in the Homegrown palette. */
 const SWATCHES = [
-  { bg: '#c83f2b', fg: '#f1e7d0' }, // riso red
-  { bg: '#5f6a2c', fg: '#f1e7d0' }, // olive
-  { bg: '#edb22a', fg: '#1b1712' }, // yellow
-  { bg: '#2f5d6b', fg: '#f1e7d0' }, // blue
-  { bg: '#1b1712', fg: '#edb22a' }, // ink/yellow
-  { bg: '#3a342b', fg: '#f1e7d0' }, // dark
+  { bg: '#3a3f9e', fg: '#fffdf8' }, // indigo
+  { bg: '#ffc83d', fg: '#22261c' }, // sun
+  { bg: '#dcddf7', fg: '#20235e' }, // lavender
+  { bg: '#2f7a45', fg: '#fffdf8' }, // good green
+  { bg: '#22261c', fg: '#ffc83d' }, // soil/sun
+  { bg: '#c8643b', fg: '#fffdf8' }, // clay
 ]
 
 /** Deterministic swatch derived from the name string. */
@@ -50,6 +50,7 @@ export function relativeAge(iso: string): string {
   if (days <= 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days} days ago`
+  if (days < 14) return 'last week'
   if (days < 30) return `${Math.floor(days / 7)} weeks ago`
   if (days < 365) return `${Math.floor(days / 30)} months ago`
   const years = Math.floor(days / 365)

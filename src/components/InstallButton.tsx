@@ -37,7 +37,7 @@ export function InstallButton() {
   }
 
   return (
-    <button onClick={install} className="btn-press bg-riso-yellow px-2 py-1 text-xs">
+    <button onClick={install} className="btn-press bg-sun px-3 py-1.5 text-xs">
       Install
     </button>
   )

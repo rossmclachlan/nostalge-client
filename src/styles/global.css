@@ -2,65 +2,46 @@
 
 /* ------------------------------------------------------------------ */
 /*  NOSTALGE — design tokens                                          */
-/*  Independent record store meets DIY zine. Kraft paper, riso ink,   */
-/*  hand-cut flyers, faded photocopier toner.                         */
+/*  A flavor of the Homegrown household brand (shared with Mise and   */
+/*  Priorities): the record shop. Same soil ink, sun, body face and   */
+/*  stickers; Nostalge's own crop is indigo and a soft serif. The     */
+/*  paper stays quiet so the sleeves can be loud. Light only.         */
 /* ------------------------------------------------------------------ */
 @theme {
-  /* Paper & ink */
-  --color-paper: #f1e7d0;
-  --color-paper-2: #e8dbbd;
-  --color-paper-3: #ddcca4;
-  --color-kraft: #c7a877;
-  --color-ink: #1b1712;
-  --color-ink-2: #3a342b;
-  --color-ink-3: #6b6353;
+  /* Paper & ink. paper = sleeve (the page), paper-2 = shelf (raised
+     surfaces), paper-3 = a pressed / tinted surface. */
+  --color-paper: #f5f0e6;
+  --color-paper-2: #fffdf8;
+  --color-paper-3: #ebe4d6;
+  --color-kraft: #e4dccb;
+  --color-ink: #22261c;
+  --color-ink-2: #3e4337;
+  --color-ink-3: #5e6455;
 
-  /* Risograph accents */
-  --color-riso-red: #c83f2b;
-  --color-riso-olive: #5f6a2c;
-  --color-riso-yellow: #edb22a;
-  --color-riso-blue: #2f5d6b;
+  /* Homegrown foundation + Nostalge's crop */
+  --color-sun: #ffc83d;
+  --color-sun-soft: #ffedb8;
+  --color-indigo: #3a3f9e;
+  --color-lavender: #dcddf7;
+
+  /* Older accent names, mapped onto the flavor so existing classes keep
+     working: red carries links and kickers (indigo), olive means "good",
+     yellow is the sun. */
+  --color-riso-red: #3a3f9e;
+  --color-riso-olive: #2f7a45;
+  --color-riso-yellow: #ffc83d;
+  --color-riso-blue: #3a3f9e;
 
   /* Type */
-  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
-  --font-body: 'Archivo', 'Helvetica Neue', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Bricolage Grotesque', ui-rounded, system-ui, sans-serif;
 
-  /* Hard, photocopied edges — almost no rounding */
-  --radius-sticker: 2px;
+  --radius-sticker: 10px;
 
-  /* Colour of the hard offset drop-shadow on cards/buttons. Overridden in
-     dark mode so the pinned-to-corkboard effect still reads. */
-  --shadow-ink: rgba(27, 23, 18, 0.85);
+  /* The sticker's hard offset shadow. */
+  --shadow-ink: #22261c;
 
-  /* Background of the selected bottom-nav tab. A strong inked block in light
-     mode; a subtle warm elevation in dark mode (see .dark) so it doesn't
-     glare. */
-  --nav-active-bg: var(--color-ink);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Dark mode — swap paper/ink, keep the riso accents                  */
-/* ------------------------------------------------------------------ */
-.dark {
-  --color-paper: #1e1913;
-  --color-paper-2: #2a241b;
-  --color-paper-3: #352e22;
-  --color-kraft: #4f4230;
-  --color-ink: #ece3cf;
-  --color-ink-2: #c9bfa6;
-  --color-ink-3: #8c8369;
-
-  /* Slightly brighter accents so they pop on the dark ground */
-  --color-riso-red: #e0573f;
-  --color-riso-olive: #8a9a45;
-  --color-riso-yellow: #edb22a;
-  --color-riso-blue: #4f8aa0;
-
-  /* A near-black offset reads as depth against the (lighter) dark cards */
-  --shadow-ink: rgba(0, 0, 0, 0.7);
-
-  /* Subtle warm elevation instead of a bright cream block */
-  --nav-active-bg: #3f3526;
+  --nav-active-bg: var(--color-lavender);
 }
 
 /* ------------------------------------------------------------------ */
@@ -78,128 +59,156 @@
     color: var(--color-ink);
     font-family: var(--font-body);
     background-color: var(--color-paper);
-    /* Layered paper grain + faded toner blotches */
-    background-image:
-      radial-gradient(
-        circle at 20% 15%,
-        rgba(95, 106, 44, 0.06),
-        transparent 40%
-      ),
-      radial-gradient(
-        circle at 85% 80%,
-        rgba(200, 63, 43, 0.05),
-        transparent 45%
-      ),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+    /* Faint paper grain */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
     background-attachment: fixed;
   }
 
   ::selection {
-    background: var(--color-riso-yellow);
+    background: var(--color-sun);
     color: var(--color-ink);
   }
 
+  /* Fraunces with its soft, wonky italic: the record-sleeve hand. */
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 400;
-    letter-spacing: 0.01em;
-    line-height: 0.92;
+    font-style: italic;
+    font-weight: 600;
+    font-variation-settings:
+      'SOFT' 100,
+      'WONK' 1;
+    letter-spacing: -0.01em;
+    line-height: 1;
   }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Reusable zine components                                          */
+/*  Components                                                         */
+/*  Rule of the shop: sleeves are never framed, tilted or written     */
+/*  over. Stickers, grain and tilt live on the paper, not the art.    */
 /* ------------------------------------------------------------------ */
 @layer components {
-  /* Big stamped section header */
+  /* Display heading */
   .stamp-title {
     font-family: var(--font-display);
-    font-size: clamp(2.75rem, 14vw, 4.25rem);
-    line-height: 0.85;
+    font-style: italic;
+    font-weight: 600;
+    font-variation-settings:
+      'SOFT' 100,
+      'WONK' 1;
+    font-size: clamp(2rem, 9vw, 2.75rem);
+    line-height: 1;
+    letter-spacing: -0.01em;
     color: var(--color-ink);
-    text-transform: uppercase;
   }
 
-  /* Tight tracked metadata label, small caps feel */
+  /* Small metadata label */
   .label {
     font-family: var(--font-body);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
   }
 
-  /* A flyer / record-sleeve card: hard border, drop shadow like it's */
-  /* pinned to a corkboard, with a touch of paper grain on top.        */
+  /* A soft raised surface (the shelf). */
   .flyer {
     position: relative;
     background-color: var(--color-paper-2);
-    border: 1.5px solid var(--color-ink);
-    border-radius: var(--radius-sticker);
-    box-shadow: 3px 4px 0 0 var(--shadow-ink);
+    border: 1.5px solid var(--color-kraft);
+    border-radius: 16px;
   }
 
-  /* Toner / age overlay applied with mix-blend so colours sit under it */
+  /* Kept as a no-op so older markup doesn't need touching: the toner
+     overlay is gone, grain only sits on the page background. */
   .aged::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    mix-blend-mode: multiply;
-    opacity: 0.5;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    content: none;
   }
 
-  /* Hand-written price-sticker blob */
+  /* Sun count sticker */
   .price-sticker {
-    font-family: var(--font-display);
-    background: var(--color-riso-yellow);
+    font-family: var(--font-body);
+    font-weight: 800;
+    background: var(--color-sun);
     color: var(--color-ink);
     border: 1.5px solid var(--color-ink);
-    padding: 0.05rem 0.45rem;
-    transform: rotate(-3deg);
-    box-shadow: 1px 1px 0 0 var(--shadow-ink);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+    transform: rotate(-4deg);
   }
 
-  /* A button that feels pressed: it sits on a hard shadow, and the    */
-  /* shadow collapses when you push it down.                           */
+  /* The Homegrown sticker: soil outline + hard offset shadow, presses flat. */
   .btn-press {
     font-family: var(--font-body);
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    background: var(--color-paper);
+    background: var(--color-paper-2);
     color: var(--color-ink);
-    border: 1.5px solid var(--color-ink);
-    border-radius: var(--radius-sticker);
-    box-shadow: 2px 2px 0 0 var(--shadow-ink);
+    border: 1.5px solid var(--color-kraft);
+    border-radius: 999px;
     transition:
       transform 90ms ease,
       box-shadow 90ms ease,
       background-color 90ms ease;
   }
   .btn-press:active {
-    transform: translate(2px, 2px);
-    box-shadow: 0 0 0 0 var(--shadow-ink);
+    background: var(--color-paper-3);
   }
 
-  /* Cardboard crate divider — the handwritten genre cards */
-  .divider-card {
-    position: relative;
-    background: var(--color-paper-3);
-    border: 1.5px solid var(--color-ink);
-    border-left-width: 8px;
-    border-radius: var(--radius-sticker);
-    box-shadow: 2px 3px 0 0 var(--shadow-ink);
+  .sticker {
+    border: 2px solid var(--color-ink);
+    box-shadow: 3px 3px 0 0 var(--shadow-ink);
     transition:
       transform 90ms ease,
       box-shadow 90ms ease;
   }
+  .sticker:active {
+    transform: translate(3px, 3px);
+    box-shadow: 0 0 0 0 var(--shadow-ink);
+  }
+
+  /* Discovery lens label: a small tilted sticker beside (or on the corner
+     of) the art. */
+  .lens {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    background: var(--color-sun);
+    color: var(--color-ink);
+    border: 2px solid var(--color-ink);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 800;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 2px 2px 0 0 var(--shadow-ink);
+    transform: rotate(-3deg);
+  }
+
+  /* The wobbly pebble used for the one most playful button on a screen. */
+  .pebble {
+    border-radius: 58% 42% 55% 45% / 48% 56% 44% 52%;
+    transform: rotate(-5deg);
+  }
+  .pebble.sticker:active {
+    transform: rotate(-5deg) translate(3px, 3px);
+  }
+
+  /* Tag index card */
+  .divider-card {
+    position: relative;
+    background: var(--color-paper-2);
+    border: 1.5px solid var(--color-kraft);
+    border-left-width: 6px;
+    border-radius: 12px;
+    transition: background-color 90ms ease;
+  }
   .divider-card:active {
-    transform: translate(2px, 2px);
-    box-shadow: 0 1px 0 0 var(--shadow-ink);
+    background: var(--color-paper-3);
   }
 }
 
@@ -210,12 +219,12 @@
   .tracking-tightest {
     letter-spacing: -0.03em;
   }
-  /* slight randomised tilts for that hand-pinned look */
+  /* Tilts belong to stickers now, never to artwork. */
   .tilt-l {
-    transform: rotate(-1.2deg);
+    transform: rotate(-2deg);
   }
   .tilt-r {
-    transform: rotate(1.1deg);
+    transform: rotate(2deg);
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -228,13 +237,9 @@
     padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
   }
 
-  /* Album thumbnails printed onto the card — multiply blend in light mode;
-     switched off in dark mode so the art doesn't crush to black. */
-  .sleeve-blend {
-    mix-blend-mode: multiply;
-  }
-  .dark .sleeve-blend {
-    mix-blend-mode: normal;
+  /* A quiet lift under hero artwork. */
+  .sleeve-lift {
+    box-shadow: 0 10px 28px rgba(34, 38, 28, 0.22);
   }
 
   /* Discovery card entrance (played on shuffle via a keyed remount). */

@@ -28,7 +28,7 @@ export function BottomNav({
 }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t-[1.5px] border-ink bg-paper-2"
+      className="fixed inset-x-0 bottom-0 z-30 border-t-[1.5px] border-kraft bg-paper-2"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className="mx-auto grid max-w-md grid-cols-3 sm:max-w-xl">
@@ -40,14 +40,20 @@ export function BottomNav({
                 onClick={() => onChange(id)}
                 aria-current={on ? 'page' : undefined}
                 className={cn(
-                  'flex w-full flex-col items-center gap-1 py-2.5 transition-colors',
-                  on
-                    ? 'bg-[var(--nav-active-bg)] text-riso-yellow'
-                    : 'text-ink-2 active:bg-paper-3',
+                  'flex w-full flex-col items-center gap-1 pb-2 pt-2.5 text-[0.7rem] font-bold',
+                  on ? 'text-ink' : 'text-ink-3',
                 )}
               >
-                <Icon className="h-[22px] w-[22px]" strokeWidth={on ? 2.4 : 1.8} />
-                <span className="label text-[0.6rem]">{label}</span>
+                {/* The active tab is a sticker pill. */}
+                <span
+                  className={cn(
+                    'grid h-8 w-14 place-items-center rounded-full transition-colors',
+                    on && 'border-2 border-ink bg-[var(--nav-active-bg)] shadow-[2px_2px_0_0_var(--shadow-ink)]',
+                  )}
+                >
+                  <Icon className="h-[22px] w-[22px]" strokeWidth={on ? 2.2 : 1.8} />
+                </span>
+                {label}
               </button>
             </li>
           )

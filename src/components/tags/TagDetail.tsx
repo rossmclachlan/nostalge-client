@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { MusicData } from '@/lib/types'
 import { albumsForTag, artistsForTag, type AlbumWithArtist } from '@/lib/derive'
 import { formatPlays } from '@/lib/format'
-import { Cover } from '../Cover'
+import { CoverTile } from '../CoverTile'
 import { DetailHeader } from '../DetailHeader'
 
 /** Fisher–Yates shuffle (returns a new array). */
@@ -41,36 +41,30 @@ export function TagDetail({
       <DetailHeader title="Tag" onBack={onBack} />
 
       <div className="p-4">
-        <p className="label text-riso-red mb-1">filed under</p>
-        <h1 className="stamp-title text-[2.75rem] break-words">{tag?.name ?? 'Unknown'}</h1>
+        <p className="label text-ink-3 mb-1">filed under</p>
+        <h1 className="text-[2.4rem] break-words">{tag?.name ?? 'Unknown'}</h1>
 
         {/* Albums first */}
         {albums.length > 0 && (
           <>
             <div className="mt-6 mb-3 flex items-center justify-between gap-3">
-              <h2 className="stamp-title text-[1.6rem]">Albums</h2>
+              <h2 className="text-[1.3rem]">Records</h2>
               <button
                 onClick={() => setShuffled(shuffle(albums))}
-                className="btn-press px-3 py-1.5 text-xs"
+                className="btn-press px-3.5 py-1.5 text-xs"
               >
-                ↻ Shuffle
+                Shuffle
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-              {displayAlbums.map((album, i) => (
-                <button
+            <div className="grid grid-cols-3 gap-x-2.5 gap-y-3.5 sm:grid-cols-4 lg:grid-cols-6">
+              {displayAlbums.map((album) => (
+                <CoverTile
                   key={album.id}
+                  title={album.title}
+                  subtitle={album.artistName}
+                  src={album.image_url}
                   onClick={() => onOpenAlbum(album.id)}
-                  className="flyer block p-2 text-left transition-transform active:translate-y-[2px] active:shadow-none"
-                >
-                  <div className={i % 2 === 0 ? 'tilt-l' : 'tilt-r'}>
-                    <Cover name={album.title} src={album.image_url} />
-                  </div>
-                  <h3 className="font-display mt-2 text-lg leading-none text-ink uppercase line-clamp-2">
-                    {album.title}
-                  </h3>
-                  <p className="label text-ink-3 mt-1 truncate">{album.artistName}</p>
-                </button>
+                />
               ))}
             </div>
           </>
@@ -79,13 +73,13 @@ export function TagDetail({
         {/* Artists below */}
         {artists.length > 0 && (
           <>
-            <h2 className="stamp-title mt-8 mb-3 text-[1.6rem]">Artists</h2>
+            <h2 className="mt-8 mb-3 text-[1.3rem]">Artists</h2>
             <div className="flex flex-wrap gap-2">
               {artists.map((a) => (
                 <button
                   key={a.id}
                   onClick={() => onOpenArtist(a.id)}
-                  className="btn-press px-2.5 py-1 text-sm"
+                  className="btn-press px-3 py-1.5 text-sm"
                 >
                   {a.name}
                   {a.play_count > 0 && (

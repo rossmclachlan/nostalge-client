@@ -1,17 +1,18 @@
-import { CATEGORY_META, type DiscoveryCard as Card, type CardAlbum } from '@/lib/discovery/engine'
+import { useState } from 'react'
+import type { DiscoveryCard as Card, CardAlbum } from '@/lib/discovery/engine'
+import { cn } from '@/lib/cn'
 import { Cover } from '../Cover'
+import { InfoIcon } from '../icons'
 
-/* Rotate through paper tones + a subtle pinned-to-board tilt per card. */
-const TONES = ['bg-paper', 'bg-paper-2', 'bg-paper-3']
-const TILTS = ['-0.8deg', '0.7deg', '-0.5deg', '0.6deg']
+/* Alternate the lens sticker between sun and lavender down the stream. */
+const LENS_TONES = ['bg-sun', 'bg-lavender']
 
 /**
- * One discovery card. The artwork is the point: the sleeves get the space, the
- * words stay out of their way, and a card with several records becomes a
- * scrollable strip rather than a cramped grid.
+ * One discovery lens in the Stream view. The art carries it: the lens name is
+ * a small sticker, the story behind it waits behind the "why?" button, and the
+ * play-count metric lives on the record page instead.
  *
- * There is no call-to-action button — the covers are the affordance, and
- * tapping one opens the record.
+ * A lone record gets the full width; several become a strip you flip through.
  */
 export function DiscoveryCard({
   card,
@@ -22,88 +23,88 @@ export function DiscoveryCard({
   index: number
   onOpenAlbum: (id: string) => void
 }) {
-  const meta = CATEGORY_META[card.category]
-  const tone = TONES[index % TONES.length]
-  const tilt = TILTS[index % TILTS.length]
+  const [why, setWhy] = useState(false)
   const single = card.albums.length === 1
 
   return (
-    <div className="card-in" style={{ animationDelay: `${index * 70}ms` }}>
-      <article
-        className={`flyer aged ${tone} p-4`}
-        style={{ transform: `rotate(${tilt})` }}
-      >
-        {/* Category and the metric share one line — the metric used to be a
-            block of its own and cost the artwork a chunk of height. */}
-        <div className="mb-2 flex items-center gap-2">
-          <span
-            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-ink"
-            style={{ backgroundColor: meta.dot }}
-          />
-          <span className="label truncate text-ink-3">{meta.label}</span>
-          {card.metric && (
-            <span className="price-sticker ml-auto inline-flex shrink-0 items-baseline gap-1 leading-none">
-              <span className="text-base">{card.metric.value}</span>
-              <span className="label text-[0.5rem]">{card.metric.label}</span>
-            </span>
+    <section className="card-in" style={{ animationDelay: `${index * 70}ms` }}>
+      <div className="mb-2.5 flex items-center gap-2">
+        <h2 className={cn('lens min-w-0', LENS_TONES[index % LENS_TONES.length])}>
+          {card.headline}
+        </h2>
+        <button
+          onClick={() => setWhy((w) => !w)}
+          aria-expanded={why}
+          aria-label="Why these records"
+          className={cn(
+            'ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors',
+            why ? 'bg-ink text-paper' : 'text-ink-3 active:bg-paper-3',
           )}
+        >
+          <InfoIcon className="h-[18px] w-[18px]" />
+        </button>
+      </div>
+      {why && <p className="-mt-1 mb-3 text-sm leading-snug text-ink-2">{card.subheadline}</p>}
+
+      {single ? (
+        <Sleeve album={card.albums[0]} onOpen={onOpenAlbum} hero />
+      ) : (
+        /* Bleeds to the screen edge so the next sleeve peeks in, which is what
+           says "keep scrolling". `scroll-pl-4` lines the first sleeve up with
+           the page gutter when it snaps. */
+        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-2.5 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:scroll-pl-6 sm:px-6">
+          {card.albums.map((album) => (
+            <Sleeve
+              key={album.id}
+              album={album}
+              onOpen={onOpenAlbum}
+              className="w-[58%] max-w-[15rem] shrink-0 snap-start"
+            />
+          ))}
         </div>
-
-        <h2 className="stamp-title text-[1.9rem] leading-[0.85]">{card.headline}</h2>
-        <p className="mt-1.5 text-sm leading-snug text-ink-2">{card.subheadline}</p>
-
-        {single ? (
-          /* One record: let the sleeve carry the card. */
-          <Sleeve
-            album={card.albums[0]}
-            onOpen={onOpenAlbum}
-            className="mt-4 w-[68%] max-w-[17rem]"
-          />
-        ) : (
-          /* A crate you flip through. Bleeds to the card edges so the next
-             sleeve peeks in — that peek is what says "keep scrolling".
-             `scroll-pl-4` matters: without it the snapport starts at the
-             padding edge, so the first sleeve snaps flush to the card border
-             instead of lining up with the headline. */
-          <div className="no-scrollbar -mx-4 mt-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto px-4 pb-1">
-            {card.albums.map((album) => (
-              <Sleeve
-                key={album.id}
-                album={album}
-                onOpen={onOpenAlbum}
-                className="w-36 shrink-0 snap-start sm:w-44"
-              />
-            ))}
-          </div>
-        )}
-      </article>
-    </div>
+      )}
+    </section>
   )
 }
 
 function Sleeve({
   album,
   onOpen,
+  hero,
   className,
 }: {
   album: CardAlbum
   onOpen: (id: string) => void
+  hero?: boolean
   className?: string
 }) {
   return (
     <button
       onClick={() => onOpen(album.id)}
-      className={`block text-left ${className ?? ''}`}
-      aria-label={`${album.title} — ${album.artistName}`}
-      title={`${album.title} — ${album.artistName}`}
+      className={cn('block w-full text-left', className)}
+      aria-label={`${album.title} by ${album.artistName}`}
     >
-      <div className="sleeve-blend">
-        <Cover name={album.title} src={album.imageUrl} />
-      </div>
-      <p className="mt-1.5 truncate text-[0.7rem] font-semibold leading-tight text-ink">
+      <Cover
+        name={album.title}
+        src={album.imageUrl}
+        className={hero ? 'sleeve-lift rounded-[4px]' : undefined}
+      />
+      <p
+        className={cn(
+          'mt-2 truncate font-semibold leading-tight text-ink',
+          hero ? 'text-[0.95rem]' : 'text-[0.8rem]',
+        )}
+      >
         {album.title}
       </p>
-      <p className="truncate text-[0.7rem] leading-tight text-ink-3">{album.artistName}</p>
+      <p
+        className={cn(
+          'truncate leading-tight text-ink-3',
+          hero ? 'text-[0.85rem]' : 'text-[0.75rem]',
+        )}
+      >
+        {album.artistName}
+      </p>
     </button>
   )
 }

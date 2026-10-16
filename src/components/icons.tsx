@@ -1,4 +1,4 @@
-/* Hand-set inline icons — kept simple and chunky to suit the zine look. */
+/* Hand-set inline stroke icons. */
 import type { SVGProps } from 'react'
 
 type P = SVGProps<SVGSVGElement>
@@ -62,19 +62,6 @@ export const RefreshIcon = (p: P) => (
   </svg>
 )
 
-export const SunIcon = (p: P) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </svg>
-)
-
-export const MoonIcon = (p: P) => (
-  <svg {...base(p)}>
-    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-  </svg>
-)
-
 export const ClockIcon = (p: P) => (
   <svg {...base(p)}>
     <circle cx="12" cy="12" r="9" />
@@ -92,5 +79,44 @@ export const CopyIcon = (p: P) => (
 export const CheckIcon = (p: P) => (
   <svg {...base(p)}>
     <path d="M5 12.5 10 17.5 19 6.5" />
+  </svg>
+)
+
+export const ShuffleIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 7h3c4 0 6 10 10 10h4" />
+    <path d="m17 14 3 3-3 3" />
+    <path d="M3 17h3c1.6 0 2.8-1.5 3.8-3.4" />
+    <path d="M13.2 10.4C14.2 8.5 15.4 7 17 7h3" />
+    <path d="m17 4 3 3-3 3" />
+  </svg>
+)
+
+export const GridIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="4" y="4" width="7" height="7" rx="1" />
+    <rect x="13" y="4" width="7" height="7" rx="1" />
+    <rect x="4" y="13" width="7" height="7" rx="1" />
+    <rect x="13" y="13" width="7" height="7" rx="1" />
+  </svg>
+)
+
+export const StreamIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="4" y="4" width="16" height="11" rx="1.5" />
+    <path d="M4 19h16" />
+  </svg>
+)
+
+export const InfoIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5M12 8h.01" />
+  </svg>
+)
+
+export const ChevronIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m6 9 6 6 6-6" />
   </svg>
 )

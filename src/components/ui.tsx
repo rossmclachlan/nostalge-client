@@ -14,15 +14,15 @@ export function SectionHeader({
 }) {
   return (
     <div className={cn('mb-3', className)}>
-      {kicker && <p className="label text-riso-red mb-1">{kicker}</p>}
-      <h2 className="stamp-title text-[2rem] leading-[0.85] sm:text-[2.5rem]">
+      {kicker && <p className="label text-ink-3 mb-1">{kicker}</p>}
+      <h2 className="text-[1.6rem] sm:text-[2rem]">
         {title}
       </h2>
     </div>
   )
 }
 
-/** A little tape-on chip used for tags / metadata. */
+/** A soft pill used for tags / metadata. */
 export function Chip({
   children,
   onClick,
@@ -35,19 +35,19 @@ export function Chip({
   className?: string
 }) {
   const tones = {
-    paper: 'bg-paper text-ink',
-    red: 'bg-riso-red text-paper',
-    olive: 'bg-riso-olive text-paper',
-    yellow: 'bg-riso-yellow text-ink',
+    paper: 'bg-paper-2 text-ink',
+    red: 'bg-lavender text-ink',
+    olive: 'bg-paper-2 text-ink',
+    yellow: 'bg-sun text-ink',
   }
   const Tag = onClick ? 'button' : 'span'
   return (
     <Tag
       onClick={onClick}
       className={cn(
-        'label inline-flex items-center border-[1.5px] border-ink px-2 py-[3px] leading-none',
+        'inline-flex items-center rounded-full border-[1.5px] border-kraft px-3 py-1.5 text-[0.8rem] font-semibold leading-none',
         tones[tone],
-        onClick && 'btn-press !shadow-[1.5px_1.5px_0_0_var(--shadow-ink)]',
+        onClick && 'active:bg-paper-3',
         className,
       )}
     >
@@ -68,10 +68,7 @@ export function PlayBadge({ count, label = 'plays' }: { count: number; label?: s
 
 /**
  * Switches between the views inside a grouped tab (Crates/Tags, Recent/Stats).
- *
- * Deliberately not a third row of navigation: it reads as one pinned label
- * strip, and the selected half is filled the same way the bottom nav fills its
- * active tab.
+ * A row of filter pills; the selected one becomes an indigo sticker.
  */
 export function SegmentedControl<T extends string>({
   value,
@@ -85,14 +82,8 @@ export function SegmentedControl<T extends string>({
   className?: string
 }) {
   return (
-    <div
-      role="tablist"
-      className={cn(
-        'inline-flex border-[1.5px] border-ink shadow-[2px_2px_0_0_var(--shadow-ink)]',
-        className,
-      )}
-    >
-      {options.map((o, i) => {
+    <div role="tablist" className={cn('flex gap-1.5', className)}>
+      {options.map((o) => {
         const on = o.id === value
         return (
           <button
@@ -101,9 +92,10 @@ export function SegmentedControl<T extends string>({
             aria-selected={on}
             onClick={() => onChange(o.id)}
             className={cn(
-              'label px-3 py-1.5 leading-none transition-colors',
-              i > 0 && 'border-l-[1.5px] border-ink',
-              on ? 'bg-ink text-paper' : 'text-ink-2 active:bg-paper-3',
+              'rounded-full px-3.5 py-1.5 text-[0.8rem] font-semibold transition-colors',
+              on
+                ? 'border-2 border-ink bg-indigo text-paper-2 shadow-[2px_2px_0_0_var(--shadow-ink)]'
+                : 'border-[1.5px] border-kraft bg-paper-2 text-ink active:bg-paper-3',
             )}
           >
             {o.label}
@@ -122,8 +114,8 @@ export function EmptyState({
   body: string
 }) {
   return (
-    <div className="flyer aged tilt-l mx-auto mt-10 max-w-sm p-6 text-center">
-      <h3 className="stamp-title text-[2.25rem] text-ink">{title}</h3>
+    <div className="flyer mx-auto mt-10 max-w-sm p-6 text-center">
+      <h3 className="text-[1.75rem] text-ink">{title}</h3>
       <p className="mt-2 text-sm text-ink-2">{body}</p>
     </div>
   )

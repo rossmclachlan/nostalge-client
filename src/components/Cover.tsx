@@ -11,14 +11,14 @@ interface CoverProps {
 }
 
 /**
- * Album / artist artwork. Falls back to a generated initials block whose
+ * Album / artist artwork, unframed: nothing is drawn over the art. Falls back to a generated initials block whose
  * colour is derived from the name string, so the grid never has holes.
  */
 export function Cover({ name, src, className, shape = 'square' }: CoverProps) {
   const [broken, setBroken] = useState(false)
   const show = src && !broken
   const { bg, fg } = swatchFor(name)
-  const round = shape === 'circle' ? 'rounded-full' : 'rounded-[2px]'
+  const round = shape === 'circle' ? 'rounded-full' : 'rounded-[3px]'
 
   // `inline-size` makes this a query container, so the initials placeholder can
   // be sized against the cover rather than the viewport.
@@ -29,7 +29,7 @@ export function Cover({ name, src, className, shape = 'square' }: CoverProps) {
   return (
     <div
       className={cn(
-        'relative aspect-square w-full overflow-hidden border-[1.5px] border-ink',
+        'relative aspect-square w-full overflow-hidden bg-paper-3',
         round,
         className,
       )}
@@ -55,8 +55,6 @@ export function Cover({ name, src, className, shape = 'square' }: CoverProps) {
           </span>
         </div>
       )}
-      {/* faint toner age over the art */}
-      <span className="aged pointer-events-none absolute inset-0" />
     </div>
   )
 }

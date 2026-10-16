@@ -1,14 +1,14 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useLibrary } from '@/lib/useLibrary'
 import { cn } from '@/lib/cn'
 import { BottomNav, type Tab } from './BottomNav'
 import { InstallButton } from './InstallButton'
-import { ThemeToggle } from './ThemeToggle'
-import { RefreshIcon } from './icons'
+import { Seal } from './Seal'
+import { GridIcon, RefreshIcon, StreamIcon } from './icons'
 import { CratesTab } from './crates/CratesTab'
 import { ArtistDetail } from './crates/ArtistDetail'
 import { AlbumDetail } from './crates/AlbumDetail'
-import { DiscoveryTab } from './discovery/DiscoveryTab'
+import { DiscoveryTab, type DiscoveryView } from './discovery/DiscoveryTab'
 import { TagsTab } from './tags/TagsTab'
 import { TagDetail } from './tags/TagDetail'
 import { StatsTab } from './stats/StatsTab'
@@ -22,7 +22,7 @@ type Detail =
   | { kind: 'tag'; id: string }
 
 const TAB_TITLES: Record<Tab, string> = {
-  discovery: 'Discovery',
+  discovery: 'Discover',
   library: 'Library',
   history: 'History',
 }
@@ -43,10 +43,27 @@ const HISTORY_SECTIONS: { id: HistorySection; label: string }[] = [
 
 const newSeed = () => Math.floor(Math.random() * 0x7fffffff)
 
+const VIEW_KEY = 'nostalge:discover-view:v1'
+
+/** The Wall is the default; Stream is remembered once picked. */
+function loadView(): DiscoveryView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'stream' ? 'stream' : 'wall'
+  } catch {
+    return 'wall'
+  }
+}
+
 // The Sets tab is gone (playlists are built through the Claude connector now).
 // Clear what it left in the browser, the Gemini API key above all.
 try {
-  for (const k of ['nostalge:gemini-key:v1', 'nostalge:anthropic-key:v1', 'nostalge:playlists:v1']) {
+  // The app is light only now, so the old theme choice goes too.
+  for (const k of [
+    'nostalge:gemini-key:v1',
+    'nostalge:anthropic-key:v1',
+    'nostalge:playlists:v1',
+    'nostalge:theme',
+  ]) {
     localStorage.removeItem(k)
   }
 } catch {
@@ -61,6 +78,15 @@ export default function App() {
   // into a detail and pressing back. It only re-rolls when you deliberately
   // switch to the Discovery tab, or tap "Dig again".
   const [discoverySeed, setDiscoverySeed] = useState(newSeed)
+  const [discoveryView, setDiscoveryView] = useState<DiscoveryView>(loadView)
+  const changeDiscoveryView = useCallback((next: DiscoveryView) => {
+    setDiscoveryView(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // Storage blocked; the choice lasts this visit.
+    }
+  }, [])
   // Same reasoning as discoverySeed: kept in App so that drilling into an album
   // from Tags and pressing Back returns you to Tags, not to Crates.
   const [librarySection, setLibrarySection] = useState<LibrarySection>('crates')
@@ -124,6 +150,7 @@ export default function App() {
               artistId={detail.id}
               onBack={back}
               onOpenAlbum={openAlbum}
+              onOpenArtist={openArtist}
               onOpenTag={openTag}
             />
           )}
@@ -133,6 +160,7 @@ export default function App() {
               albumId={detail.id}
               onBack={back}
               onOpenArtist={openArtist}
+              onOpenAlbum={openAlbum}
               onOpenTag={openTag}
             />
           )}
@@ -150,17 +178,23 @@ export default function App() {
         <>
           <Masthead
             title={TAB_TITLES[tab]}
+            wordmark={tab === 'discovery'}
             connection={connection}
             syncing={syncing}
             onRefresh={refresh}
-          />
-          <main className="pb-safe px-4 pt-4 sm:px-6 lg:px-8">
+          >
+            {tab === 'discovery' && (
+              <ViewToggle value={discoveryView} onChange={changeDiscoveryView} />
+            )}
+          </Masthead>
+          <main className="pb-safe px-4 pt-2 sm:px-6 lg:px-8">
             {needsSignIn && <SignInGate onSignedIn={refresh} />}
 
             {tab === 'discovery' && (
               <DiscoveryTab
                 data={data}
                 seed={discoverySeed}
+                view={discoveryView}
                 onReroll={() => setDiscoverySeed(newSeed())}
                 onOpenAlbum={openAlbum}
               />
@@ -189,7 +223,7 @@ export default function App() {
                   onChange={changeHistorySection}
                   className="mb-4"
                 />
-                {historySection === 'recent' && <RecentTab />}
+                {historySection === 'recent' && <RecentTab data={data} onOpenAlbum={openAlbum} />}
                 {historySection === 'stats' && (
                   <StatsTab data={data} onOpenArtist={openArtist} onOpenAlbum={openAlbum} />
                 )}
@@ -206,63 +240,98 @@ export default function App() {
 
 function Masthead({
   title,
+  wordmark,
   connection,
   syncing,
   onRefresh,
+  children,
 }: {
   title: string
+  /** Show the nostalge wordmark instead of the tab title (Discover). */
+  wordmark: boolean
   connection: 'live' | 'cached' | 'empty'
   syncing: boolean
   onRefresh: () => void
+  children?: ReactNode
 }) {
   return (
-    <header className="border-b-[1.5px] border-ink bg-paper-2 px-4 pb-3 pt-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="label text-ink-3 leading-none">Nostalge</p>
-          <h1 className="stamp-title text-[2.5rem] leading-[0.8]">{title}</h1>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <ConnectionFlag connection={connection} syncing={syncing} />
-          <div className="flex items-center gap-2">
-            <InstallButton />
-            <ThemeToggle />
-            <button
-              onClick={onRefresh}
-              disabled={syncing}
-              aria-label="Refresh from server"
-              className="btn-press grid h-9 w-9 place-items-center disabled:opacity-50"
-            >
-              <RefreshIcon className={cn('h-4 w-4', syncing && 'animate-spin')} />
-            </button>
-          </div>
-        </div>
+    <header
+      className="flex items-center gap-2 px-4 pb-2 sm:px-6 lg:px-8"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
+    >
+      <Seal className="h-[30px] w-[30px]" />
+      {wordmark ? (
+        <h1 className="text-[1.6rem] font-semibold text-indigo">nostalge</h1>
+      ) : (
+        <h1 className="text-[1.75rem]">{title}</h1>
+      )}
+      <div className="ml-auto flex items-center gap-1.5">
+        {children}
+        <InstallButton />
+        <button
+          onClick={onRefresh}
+          disabled={syncing}
+          aria-label={`Refresh from server (${CONNECTION_TEXT[connection]})`}
+          title={syncing ? 'syncing…' : CONNECTION_TEXT[connection]}
+          className="relative grid h-11 w-11 place-items-center rounded-full text-ink active:bg-paper-3 disabled:opacity-60"
+        >
+          <RefreshIcon className={cn('h-5 w-5', syncing && 'animate-spin')} />
+          {/* Where the data came from: live, the cache, or nothing yet. */}
+          <span
+            className={cn(
+              'absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-[1.5px] border-paper',
+              CONNECTION_DOT[connection],
+            )}
+          />
+        </button>
       </div>
     </header>
   )
 }
 
-function ConnectionFlag({
-  connection,
-  syncing,
+const CONNECTION_TEXT = {
+  live: 'live',
+  cached: 'off the shelf',
+  empty: 'no signal',
+} as const
+
+const CONNECTION_DOT = {
+  live: 'bg-riso-olive',
+  cached: 'bg-sun',
+  empty: 'bg-ink-3',
+} as const
+
+/** Wall / Stream switch for Discover. */
+function ViewToggle({
+  value,
+  onChange,
 }: {
-  connection: 'live' | 'cached' | 'empty'
-  syncing: boolean
+  value: DiscoveryView
+  onChange: (v: DiscoveryView) => void
 }) {
-  if (syncing) {
-    return <span className="label text-ink-3">syncing…</span>
-  }
-  const map = {
-    live: { text: 'live', cls: 'bg-riso-olive text-paper' },
-    cached: { text: 'off the shelf', cls: 'bg-riso-yellow text-ink' },
-    empty: { text: 'no signal', cls: 'bg-ink text-paper' },
-  } as const
-  const f = map[connection]
+  const options = [
+    { id: 'wall' as const, label: 'Wall view', Icon: GridIcon },
+    { id: 'stream' as const, label: 'Stream view', Icon: StreamIcon },
+  ]
   return (
-    <span
-      className={cn('label border-[1.5px] border-ink px-1.5 py-[2px] leading-none', f.cls)}
-    >
-      {f.text}
-    </span>
+    <div role="group" aria-label="Discover layout" className="flex rounded-full border-[1.5px] border-kraft bg-paper-2 p-0.5">
+      {options.map(({ id, label, Icon }) => {
+        const on = value === id
+        return (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            aria-pressed={on}
+            aria-label={label}
+            className={cn(
+              'grid h-8 w-9 place-items-center rounded-full transition-colors',
+              on ? 'bg-indigo text-paper-2' : 'text-ink-3',
+            )}
+          >
+            <Icon className="h-[18px] w-[18px]" />
+          </button>
+        )
+      })}
+    </div>
   )
 }

@@ -19,18 +19,25 @@ Built with **Astro** (static output) + **React islands**, **TypeScript**, and
 
 Organised by what you actually want at the moment you open the app:
 
-- **Discover** — *be told what to play.* Generated cards pulled from your listening
+- **Discover** — *be told what to play.* Generated lenses on your listening
   history: forgotten gems, long hiatuses, records that first hit the crate in a given
-  year. The artwork is the card; tap a sleeve to open the record.
+  year. It opens on the **Wall**, a mosaic of sleeves with a small sticker naming each
+  lens (press and hold a sleeve for its title), and a toggle switches to the
+  **Stream**, one lens at a time. Tap a sleeve to open the record.
 - **Library** — *find something specific.* Two indexes into the same shelf:
-  **Crates** (every album as a card, searchable client-side) and **Tags** (the
-  collection sorted by genre / mood / era, as handwritten divider cards).
-- **History** — *look back.* The same facts at two zoom levels: **Recent** (the raw
-  scrobble feed plus sync status) and **Stats** (top artists, top albums, busiest
-  month).
+  **Crates** (every album as a cover grid, searchable client-side) and **Tags** (the
+  collection sorted by genre / mood / era, as divider cards).
+- **History** — *look back.* The same facts at two zoom levels: **Recent** (the
+  records you've spun, by day, plus sync status) and **Stats** (top artists, top
+  albums, busiest month).
 
-Library and History switch between their two views with a small segmented control at
-the top of the tab.
+The look is artwork first: sleeves are never framed or written over, each one gets a
+line for the record and a line for the artist, and play counts and notes wait one tap
+deeper on the record and artist pages. It's a flavor of the Homegrown household brand
+shared with Mise and Priorities, and it's light only.
+
+Library and History switch between their two views with a pair of pills at the top of
+the tab.
 
 ## Claude connector (MCP server)
 
@@ -133,7 +140,7 @@ src/
 ├── lib/               # data layer: pb, cache, useLibrary, derive, format
 ├── layouts/Layout.astro
 ├── pages/index.astro  # mounts the App island
-└── styles/global.css  # zine/record-store design tokens
+└── styles/global.css  # Homegrown record-shop design tokens
 ```
 
 ## Stack

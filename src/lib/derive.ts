@@ -83,6 +83,52 @@ export function albumsForArtist(data: MusicData, artistId: string): AlbumWithArt
     .sort((a, b) => b.play_count - a.play_count)
 }
 
+/**
+ * Records that share the most tags with `albumId`, by other artists: the
+ * "kindred records" strip on the record page. Ties go to the more played.
+ */
+export function kindredAlbums(data: MusicData, albumId: string, limit = 12): AlbumWithArtist[] {
+  const album = data.albums.find((a) => a.id === albumId)
+  const tags = new Set(album?.tag_relations ?? [])
+  if (!album || tags.size === 0) return []
+  const names = artistNameMap(data.artists)
+  const albumLast = lastPlayedMap(data.plays, 'al')
+  return data.albums
+    .filter((a) => a.artist !== album.artist)
+    .map((a) => ({ a, shared: (a.tag_relations ?? []).filter((t) => tags.has(t)).length }))
+    .filter(({ shared }) => shared > 0)
+    .sort((x, y) => y.shared - x.shared || y.a.play_count - x.a.play_count)
+    .slice(0, limit)
+    .map(({ a }) => ({
+      ...a,
+      artistName: names.get(a.artist) ?? 'Unknown',
+      lastPlayed: albumLast.get(a.id) ?? null,
+    }))
+}
+
+/**
+ * The artist's similar artists that are in the library ("filed near").
+ * similar_artists entries may be record ids, mbids or names.
+ */
+export function similarArtists(data: MusicData, artistId: string): Artist[] {
+  const artist = data.artists.find((a) => a.id === artistId)
+  if (!artist?.similar_artists?.length) return []
+  const byId = new Map(data.artists.map((a) => [a.id, a]))
+  const byMbid = new Map(data.artists.filter((a) => a.mbid).map((a) => [a.mbid, a]))
+  const byName = new Map(data.artists.map((a) => [a.name.toLowerCase(), a]))
+  const out: Artist[] = []
+  const seen = new Set([artistId])
+  for (const key of artist.similar_artists) {
+    const k = String(key).trim()
+    const hit = byId.get(k) ?? byMbid.get(k) ?? byName.get(k.toLowerCase())
+    if (hit && !seen.has(hit.id)) {
+      seen.add(hit.id)
+      out.push(hit)
+    }
+  }
+  return out
+}
+
 export function lastPlayedForAlbum(data: MusicData, albumId: string): number | null {
   return lastPlayedMap(data.plays, 'al').get(albumId) ?? null
 }
