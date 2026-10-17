@@ -16,14 +16,14 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | Tool | What it does |
 |---|---|
 | `search_library(query, limit?)` | Artists, releases (albums) and tracks whose names match |
-| `list_crates(limit?, page?)` | Crates, most played first, with artist, year and tags |
-| `list_tags(query?, include_years?, limit?)` / `artists_by_tag(tag, limit?)` / `tracks_by_tag(tags[], match_all?, sort?, limit?, page?)` | All tags, most used first; artists with a tag; tracks whose release or artist carries any (or all) of the tags |
+| `list_crates(limit?, page?, min_year?, max_year?, deep_history?)` | Crates, most played first, with artist, year and tags |
+| `list_tags(query?, include_years?, limit?)` / `artists_by_tag(tag, limit?)` / `tracks_by_tag(tags[], match_all?, deep_history?, sort?, limit?, page?)` | All tags, most used first; artists with a tag; tracks whose release or artist carries any (or all) of the tags |
 | `get_crate(crateId)` | One crate with artist, tags, notes and its tracklist |
 | `get_artist(artist, include_tracks?)` | One artist's whole catalogue: every release (year, tags, plays) and every track with play stats. Duplicate track records are merged so each song appears once |
 | `releases_by_tag(tag, limit?)` | Releases carrying a tag such as `shoegaze` or `90s` |
-| `find_tracks(min_plays?, max_plays?, min_duration_s?, max_duration_s?, min_year?, max_year?, first_played_from?, first_played_to?, last_played_from?, last_played_to?, sort?, limit?, page?)` | Tracks by play count, length, release year and when they were first or last played. Sorts: `most_played`, `least_played`, `recently_played`, `first_played_newest`, `first_played_oldest`, `longest`, `shortest`. `min_year`/`max_year` use the album's `release_year`, or its Last.fm year tag until enrichment fills the year in; `list_crates` takes them too |
+| `find_tracks(min_plays?, max_plays?, min_duration_s?, max_duration_s?, min_year?, max_year?, first_played_from?, first_played_to?, last_played_from?, last_played_to?, deep_history?, sort?, limit?, page?)` | Tracks by play count, length, release year and when they were first or last played. Sorts: `most_played`, `least_played`, `recently_played`, `first_played_newest`, `first_played_oldest`, `longest`, `shortest`. `min_year`/`max_year` use the album's `release_year`, or its Last.fm year tag until enrichment fills the year in; `list_crates` takes them too |
 | `connect_tidal(extra_scopes?)` | Whether TIDAL is connected, plus a one-time sign-in link (valid 10 minutes). `extra_scopes` (experimental) asks for further TIDAL permissions, such as one `probe_tidal_playback` reports |
-| `random_tracks(count?, artist?, tags[]?, min_plays?, max_plays?, min_duration_s?, max_duration_s?, min_year?, max_year?)` | N random songs matching the filters. Every matching song is equally likely: songs stored as two track records aren't picked twice as often |
+| `random_tracks(count?, artist?, tags[]?, min_plays?, max_plays?, min_duration_s?, max_duration_s?, min_year?, max_year?, deep_history?)` | N random songs matching the filters. Every matching song is equally likely: songs stored as two track records aren't picked twice as often |
 | `create_tidal_playlist(name, description?, track_ids[], dry_run?)` | Matches library tracks on TIDAL and creates an unlisted playlist in that order. `dry_run` (default `true`) only previews the matches and misses |
 | `search_tidal(query, types[]?, limit?)` | Searches TIDAL's catalogue for tracks, albums and artists, including music you don't own. Each result says `in_library` (with `library_id`): tracks by a saved match or same title and artist, albums and artists by name |
 | `list_tidal_playlists(limit?)` | Your own TIDAL playlists, most recently changed first, with ids, track counts and links |
@@ -37,6 +37,8 @@ Claude ──▶ Worker (/mcp)  ──HTTPS──▶  Tailscale Funnel ──▶
 | `delete_tidal_playlist(playlist_id, confirm_name)` | Deletes a playlist. `confirm_name` must be its exact current name |
 | `compare_artist_with_tidal(artist, tidal_artist_id?)` | One artist's releases in the library vs on TIDAL: only in the library, only on TIDAL (newest first), and in both. Editions such as "Deluxe" or "Remastered" count as the same release |
 | `probe_tidal_playback()` | Experimental, read-only: whether TIDAL lets this app see playback (play/pause state, your TIDAL devices, the play queue), and TIDAL's playback-related permissions with their access tiers. Groundwork for remote-control tools |
+
+**Deep history.** `list_crates`, `find_tracks`, `random_tracks` and `tracks_by_tag` take `deep_history`: `true` for only the music imported from the NAS archive (from before consistent scrobbling; no plays), `false` to leave it out, omitted for everything. Results mark those items `deep_history: true`. They are also tagged `deep history`. See music-cms-mvp's migration 014 and `import-deep-history.js`.
 
 **How the PocketBase schema maps to these tools.** The schema comes from the `music-cms-mvp`
 migrations. It has no `crates` or `releases` collections, so:

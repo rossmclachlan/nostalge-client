@@ -9,12 +9,16 @@
  *            first_played_at, last_played_at (play stats derived from scrobbles)
  *   tags     name (unique), slug (unique), usage_count
  *
+ * artists, albums and tracks also have source and deep_history (see
+ * deep-history.ts).
+ *
  * There are no "crates" or "releases" collections. Matching the app's Crates
  * tab, a crate is an album, and an album is the release.
  */
 
 import { type PocketBase, PocketBaseError, pbString } from "./pocketbase";
 import { type YearRange, yearFilter } from "./year-filter";
+import { deepHistoryFilter, deepHistoryMark } from "./deep-history";
 
 type Base = { id: string; created: string; updated: string };
 type TagRec = Base & { name: string; slug: string; usage_count: number };
@@ -32,6 +36,7 @@ type AlbumRec = Base & {
 	track_count: number;
 	wiki_summary: string;
 	tag_relations: string[];
+	deep_history?: boolean;
 	expand?: { artist?: ArtistRec; tag_relations?: TagRec[] };
 };
 type TrackRec = Base & {
@@ -42,6 +47,7 @@ type TrackRec = Base & {
 	play_count: number;
 	first_played_at: string;
 	last_played_at: string;
+	deep_history?: boolean;
 	expand?: { artist?: ArtistRec; album?: AlbumRec };
 };
 
@@ -96,6 +102,7 @@ function release(a: AlbumRec) {
 		play_count: a.play_count ?? 0,
 		track_count: a.track_count ?? 0,
 		tags: (a.expand?.tag_relations ?? []).map((t) => t.name),
+		...deepHistoryMark(a),
 	};
 }
 
@@ -110,6 +117,7 @@ function track(t: TrackRec) {
 		play_count: t.play_count ?? 0,
 		first_played: t.first_played_at ? t.first_played_at.slice(0, 10) : null,
 		last_played: t.last_played_at ? t.last_played_at.slice(0, 10) : null,
+		...deepHistoryMark(t),
 	};
 }
 
@@ -169,10 +177,13 @@ export async function searchLibrary(pb: PocketBase, query: string, limit?: numbe
 	};
 }
 
-export async function listCrates(pb: PocketBase, opts: { limit?: number; page?: number } & YearRange = {}) {
-	const years = await yearFilter(pb, opts);
+export async function listCrates(
+	pb: PocketBase,
+	opts: { limit?: number; page?: number; deep_history?: boolean } & YearRange = {},
+) {
+	const where = [await yearFilter(pb, opts), deepHistoryFilter(opts.deep_history)].filter((w) => w !== null);
 	const res = await pb.list<AlbumRec>("albums", {
-		...(years ? { filter: years } : {}),
+		...(where.length ? { filter: where.join(" && ") } : {}),
 		sort: "-play_count",
 		expand: "artist,tag_relations",
 		perPage: clamp(opts.limit, 100, 200),
@@ -253,6 +264,7 @@ export type FindTracksOptions = YearRange & {
 	first_played_to?: string;
 	last_played_from?: string;
 	last_played_to?: string;
+	deep_history?: boolean;
 	sort?: keyof typeof TRACK_SORTS;
 	limit?: number;
 	page?: number;
@@ -273,6 +285,8 @@ export async function findTracks(pb: PocketBase, o: FindTracksOptions) {
 	const years = await yearFilter(pb, o, "album.");
 	if (years) where.push(years);
 	if (o.max_duration_s !== undefined) where.push(`duration_ms<=${o.max_duration_s * 1000}`);
+	const deep = deepHistoryFilter(o.deep_history);
+	if (deep) where.push(deep);
 	for (const [field, from, to] of [
 		["first_played_at", o.first_played_from, o.first_played_to],
 		["last_played_at", o.last_played_from, o.last_played_to],
@@ -283,7 +297,9 @@ export async function findTracks(pb: PocketBase, o: FindTracksOptions) {
 	}
 	const sort = o.sort ?? "most_played";
 	// Sorting by a play date only makes sense among tracks that have been played.
-	if (/played_at/.test(TRACK_SORTS[sort]) && !where.some((w) => w.startsWith("first_played_at") || w.startsWith("last_played_at"))) {
+	// Only the primary key counts: most_played breaks ties on last_played_at,
+	// and must still return never-played tracks (max_plays: 0, deep history).
+	if (/played_at/.test(TRACK_SORTS[sort].split(",")[0]) && !where.some((w) => w.startsWith("first_played_at") || w.startsWith("last_played_at"))) {
 		where.push("last_played_at!=\"\"");
 	}
 	if (/duration_ms/.test(TRACK_SORTS[sort]) && !where.includes("duration_ms>0")) where.push("duration_ms>0");

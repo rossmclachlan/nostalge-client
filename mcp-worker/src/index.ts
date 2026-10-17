@@ -8,6 +8,7 @@ import { GitHubHandler } from "./github-handler";
 import { findTracks, getCrate, listCrates, releasesByTag, searchLibrary, TRACK_SORTS } from "./library";
 import { createTidalPlaylist } from "./playlist";
 import { randomTracks } from "./random";
+import { DEEP_HISTORY_NOTE, deepHistoryParam } from "./deep-history";
 import { PocketBase } from "./pocketbase";
 import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
 import { SEARCH_TYPES, searchTidal } from "./tidal-search";
@@ -94,15 +95,18 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 		this.server.tool(
 			"list_crates",
-			"List crates (albums/releases) in the library, most played first, with artist, year and tags. Paginated.",
+			`List crates (albums/releases) in the library, most played first, with artist, year and tags. Paginated. ${DEEP_HISTORY_NOTE}`,
 			{
 				limit: z.number().int().min(1).max(200).optional().describe("Crates per page (default 100)"),
 				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
 				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year"),
 				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year"),
+				deep_history: deepHistoryParam,
 			},
-			async ({ limit, page, min_year, max_year }) =>
-				this.run("list_crates", { limit, page, min_year, max_year }, () => listCrates(this.pb(), { limit, page, min_year, max_year })),
+			async ({ limit, page, min_year, max_year, deep_history }) =>
+				this.run("list_crates", { limit, page, min_year, max_year, deep_history }, () =>
+					listCrates(this.pb(), { limit, page, min_year, max_year, deep_history }),
+				),
 		);
 
 		this.server.tool(
@@ -157,10 +161,11 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 		this.server.tool(
 			"tracks_by_tag",
-			"Find tracks whose release or artist carries the given tags: any of them (default) or all of them. Tag names are case-insensitive. Paginated; has_more says whether there's another page.",
+			`Find tracks whose release or artist carries the given tags: any of them (default) or all of them. Tag names are case-insensitive. Paginated; has_more says whether there's another page. ${DEEP_HISTORY_NOTE}`,
 			{
 				tags: z.array(z.string().min(1).max(100)).min(1).max(10).describe("Tag names"),
 				match_all: z.boolean().optional().describe("true: every tag must match; false (default): any tag"),
+				deep_history: deepHistoryParam,
 				sort: z.enum(Object.keys(TAG_TRACK_SORTS) as [keyof typeof TAG_TRACK_SORTS, ...(keyof typeof TAG_TRACK_SORTS)[]]).optional().describe("most_played (default), recently_played or least_played"),
 				limit: z.number().int().min(1).max(100).optional().describe("Tracks per page (default 25)"),
 				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
@@ -177,6 +182,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				"'First played' is the best stand-in for 'date added', since most tracks were bulk-imported on one day.",
 				"Only ~73% of tracks have a duration; duration filters skip the rest. Paginated.",
 				"min_year/max_year filter on the album's release year (or its Last.fm year tag where the year isn't filled in yet).",
+				DEEP_HISTORY_NOTE,
 			].join(" "),
 			{
 				min_plays: z.number().int().min(0).optional().describe("At least this many plays"),
@@ -189,6 +195,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				first_played_to: isoDate.optional().describe("First played on or before (YYYY-MM-DD)"),
 				last_played_from: isoDate.optional().describe("Last played on or after (YYYY-MM-DD)"),
 				last_played_to: isoDate.optional().describe("Last played on or before (YYYY-MM-DD)"),
+				deep_history: deepHistoryParam,
 				sort: z
 					.enum(Object.keys(TRACK_SORTS) as [keyof typeof TRACK_SORTS, ...(keyof typeof TRACK_SORTS)[]])
 					.optional()
@@ -201,7 +208,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 		this.server.tool(
 			"random_tracks",
-			"Pick N random songs from the library, optionally by artist, tags (any), play count, length or release year. Every matching song is equally likely (duplicate track records are accounted for). Use it instead of fetching everything and choosing.",
+			`Pick N random songs from the library, optionally by artist, tags (any), play count, length, release year or deep history. Every matching song is equally likely (duplicate track records are accounted for). Use it instead of fetching everything and choosing. ${DEEP_HISTORY_NOTE}`,
 			{
 				count: z.number().int().min(1).max(50).optional().describe("How many songs (default 10)"),
 				artist: z.string().min(1).max(200).optional().describe("Artist name (case-insensitive) or id"),
@@ -212,6 +219,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				max_duration_s: z.number().int().min(1).optional().describe("Maximum length in seconds"),
 				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year"),
 				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year"),
+				deep_history: deepHistoryParam,
 			},
 			async (opts) => this.run("random_tracks", opts, () => randomTracks(this.pb(), opts)),
 		);
