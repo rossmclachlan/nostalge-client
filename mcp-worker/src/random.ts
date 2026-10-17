@@ -10,6 +10,7 @@
 
 import { fold } from "./matching";
 import { isRecordId, type PocketBase, PocketBaseError, pbString } from "./pocketbase";
+import { deepHistoryFilter, deepHistoryMark } from "./deep-history";
 
 const YEAR_TAG = /^(19|20)\d\d$/;
 const OVERSAMPLE = 3;
@@ -25,6 +26,7 @@ type TrackRec = {
 	play_count: number;
 	first_played_at: string;
 	last_played_at: string;
+	deep_history?: boolean;
 	expand?: { artist?: { name: string }; album?: { title: string; release_year: number } };
 };
 
@@ -38,6 +40,7 @@ export type RandomOptions = {
 	max_duration_s?: number;
 	min_year?: number;
 	max_year?: number;
+	deep_history?: boolean;
 };
 
 async function artistId(pb: PocketBase, artist: string): Promise<{ id: string; name: string }> {
@@ -115,6 +118,8 @@ export async function randomTracks(pb: PocketBase, o: RandomOptions) {
 	if (o.max_duration_s !== undefined) where.push(`duration_ms<=${o.max_duration_s * 1000}`);
 	const years = await yearCondition(pb, o.min_year, o.max_year);
 	if (years) where.push(years);
+	const deep = deepHistoryFilter(o.deep_history);
+	if (deep) where.push(deep);
 	const filter = where.join(" && ");
 
 	const picked = new Map<string, { song: TrackRec[]; first: TrackRec }>();
@@ -176,6 +181,7 @@ export async function randomTracks(pb: PocketBase, o: RandomOptions) {
 			play_count: song.reduce((n, s) => n + (s.play_count ?? 0), 0),
 			first_played: firsts[0]?.slice(0, 10) ?? null,
 			last_played: lasts[lasts.length - 1]?.slice(0, 10) ?? null,
+			...deepHistoryMark(first),
 		};
 	});
 	return {

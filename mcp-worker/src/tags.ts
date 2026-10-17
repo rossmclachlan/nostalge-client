@@ -6,6 +6,7 @@
  */
 
 import { type PocketBase, pbString } from "./pocketbase";
+import { deepHistoryFilter, deepHistoryMark } from "./deep-history";
 
 type TagRec = { id: string; name: string; slug: string; usage_count: number };
 type ArtistRec = { id: string; name: string; play_count: number; tag_relations: string[]; expand?: { tag_relations?: TagRec[] } };
@@ -17,6 +18,7 @@ type TrackRec = {
 	play_count: number;
 	first_played_at: string;
 	last_played_at: string;
+	deep_history?: boolean;
 	expand?: {
 		artist?: { name: string; tag_relations: string[] };
 		album?: { title: string; release_year: number; tag_relations: string[] };
@@ -96,7 +98,7 @@ export const TAG_TRACK_SORTS = {
 
 export async function tracksByTag(
 	pb: PocketBase,
-	opts: { tags: string[]; match_all?: boolean; sort?: keyof typeof TAG_TRACK_SORTS; limit?: number; page?: number },
+	opts: { tags: string[]; match_all?: boolean; deep_history?: boolean; sort?: keyof typeof TAG_TRACK_SORTS; limit?: number; page?: number },
 ) {
 	const { found, unknown } = await resolveTags(pb, opts.tags);
 	if (found.length === 0 || (opts.match_all && unknown.length)) {
@@ -104,7 +106,9 @@ export async function tracksByTag(
 	}
 	// One condition per tag: on the track's album or its artist.
 	const has = (t: TagRec) => `(album.tag_relations~${pbString(t.id)} || artist.tag_relations~${pbString(t.id)})`;
-	const filter = found.map(has).join(opts.match_all ? " && " : " || ");
+	const deep = deepHistoryFilter(opts.deep_history);
+	const tagged = found.map(has).join(opts.match_all ? " && " : " || ");
+	const filter = deep ? `(${tagged}) && ${deep}` : tagged;
 	const sort = opts.sort ?? "most_played";
 	const limit = clamp(opts.limit, 25, 100);
 	const page = Math.max(1, opts.page ?? 1);
@@ -138,6 +142,7 @@ export async function tracksByTag(
 				play_count: t.play_count ?? 0,
 				last_played: t.last_played_at ? t.last_played_at.slice(0, 10) : null,
 				matched_tags: found.filter((f) => ids.has(f.id)).map((f) => name.get(f.id)!),
+				...deepHistoryMark(t),
 			};
 		}),
 	};
