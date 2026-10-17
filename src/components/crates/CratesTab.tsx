@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { MusicData } from '@/lib/types'
-import { allAlbums, type AlbumWithArtist } from '@/lib/derive'
-import { formatPlays } from '@/lib/format'
-import { Cover } from '../Cover'
+import { allAlbums } from '@/lib/derive'
+import { CoverTile } from '../CoverTile'
 import { EmptyState } from '../ui'
 import { SearchIcon } from '../icons'
 
@@ -37,61 +36,32 @@ export function CratesTab({
 
   return (
     <div>
-      <p className="label text-ink-3 mb-2">{data.albums.length} sleeves in the crate</p>
-
-      {/* Search */}
-      <div className="flyer mb-5 flex items-center gap-2 px-3 py-2">
-        <SearchIcon className="h-5 w-5 text-ink-3" />
+      <label className="mb-4 flex items-center gap-2 rounded-full border-[1.5px] border-kraft bg-paper-2 px-4 py-2 focus-within:border-ink">
+        <SearchIcon className="h-[18px] w-[18px] shrink-0 text-ink-3" />
+        <span className="sr-only">Search {data.albums.length} records</span>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Flip through the crates…"
-          className="w-full bg-transparent text-ink placeholder:text-ink-3 focus:outline-none"
+          placeholder={`Flip through ${data.albums.length} records`}
+          className="w-full bg-transparent text-[0.95rem] text-ink placeholder:text-ink-3 focus:outline-none"
         />
-      </div>
+      </label>
 
       {albums.length === 0 ? (
-        <p className="label text-ink-3 mt-8 text-center">No albums match “{query}”</p>
+        <p className="label text-ink-3 mt-8 text-center">No records match “{query}”</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {albums.map((album, i) => (
-            <AlbumCard
+        <div className="grid grid-cols-3 gap-x-2.5 gap-y-3.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+          {albums.map((album) => (
+            <CoverTile
               key={album.id}
-              album={album}
-              tilt={i % 2 === 0 ? 'tilt-l' : 'tilt-r'}
+              title={album.title}
+              subtitle={album.artistName}
+              src={album.image_url}
               onClick={() => onOpenAlbum(album.id)}
             />
           ))}
         </div>
       )}
     </div>
-  )
-}
-
-function AlbumCard({
-  album,
-  tilt,
-  onClick,
-}: {
-  album: AlbumWithArtist
-  tilt: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flyer block p-2 text-left transition-transform active:translate-y-[2px] active:shadow-none"
-    >
-      <div className={tilt}>
-        <Cover name={album.title} src={album.image_url} />
-      </div>
-      <h3 className="font-display mt-2 text-lg leading-none text-ink uppercase line-clamp-2">
-        {album.title}
-      </h3>
-      <p className="label text-ink-3 mt-1 truncate">{album.artistName}</p>
-      {album.play_count > 0 && (
-        <p className="label text-ink-3 mt-0.5">{formatPlays(album.play_count)} plays</p>
-      )}
-    </button>
   )
 }

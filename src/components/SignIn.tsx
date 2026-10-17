@@ -35,14 +35,14 @@ export function SignInGate({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <form
-      className="flyer aged tilt-l mx-auto mb-6 mt-2 max-w-sm p-5"
+      className="flyer mx-auto mb-6 mt-2 max-w-sm p-5"
       onSubmit={(e) => {
         e.preventDefault()
         void submit()
       }}
     >
-      <p className="label text-riso-red mb-1">Members only</p>
-      <h3 className="stamp-title text-[2rem] leading-[0.85]">Sign in</h3>
+      <p className="label text-ink-3 mb-1">Members only</p>
+      <h3 className="text-[1.75rem]">Sign in</h3>
       <p className="mt-2 text-sm text-ink-2">
         The NAS answered, but it only shows the collection to signed-in
         listeners. What's already on this device stays put either way.

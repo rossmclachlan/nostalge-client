@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MusicData, Tag, Track } from '@/lib/types'
-import { lastPlayedForAlbum } from '@/lib/derive'
+import { albumsForArtist, kindredAlbums, lastPlayedForAlbum } from '@/lib/derive'
 import { fetchTracksForAlbum } from '@/lib/pb'
 import { formatPlays, plainText, relativeAge } from '@/lib/format'
 import { Cover } from '../Cover'
-import { Chip, PlayBadge } from '../ui'
+import { Chip } from '../ui'
+import { CoverRow, CoverTile } from '../CoverTile'
+import { Disclosure } from '../Disclosure'
 import { CopyButton } from '../CopyButton'
 import { DetailHeader } from '../DetailHeader'
 
@@ -20,12 +22,14 @@ export function AlbumDetail({
   albumId,
   onBack,
   onOpenArtist,
+  onOpenAlbum,
   onOpenTag,
 }: {
   data: MusicData
   albumId: string
   onBack: () => void
   onOpenArtist: (id: string) => void
+  onOpenAlbum: (id: string) => void
   onOpenTag: (id: string) => void
 }) {
   const album = data.albums.find((a) => a.id === albumId)
@@ -35,6 +39,12 @@ export function AlbumDetail({
     () => resolveTags(data, album?.tag_relations ?? []),
     [data, album],
   )
+
+  const moreByArtist = useMemo(
+    () => (album ? albumsForArtist(data, album.artist).filter((a) => a.id !== albumId) : []),
+    [data, album, albumId],
+  )
+  const kindred = useMemo(() => kindredAlbums(data, albumId), [data, albumId])
 
   const [tracks, setTracks] = useState<Track[]>([])
   const [loadingTracks, setLoadingTracks] = useState(true)
@@ -65,93 +75,116 @@ export function AlbumDetail({
 
   return (
     <div>
-      <DetailHeader title="Album" onBack={onBack} />
+      <DetailHeader title="Record" onBack={onBack} />
 
-      <div className="p-4">
-        <div className="tilt-r mx-auto w-2/3 max-w-[16rem]">
-          <Cover name={album.title} src={album.image_url} />
+      {/* The sleeve first, as big as the screen allows. */}
+      <div className="px-4 pt-2">
+        <div className="mx-auto w-[86%] max-w-sm">
+          <Cover name={album.title} src={album.image_url} className="sleeve-lift rounded-[4px]" />
         </div>
+      </div>
 
-        <div className="mt-5 text-center">
-          <h1 className="stamp-title text-[2.2rem] break-words">{album.title}</h1>
-          {artist && (
-            <button
-              onClick={() => onOpenArtist(artist.id)}
-              className="label text-riso-red mt-1 underline-offset-2 active:underline"
-            >
-              {artist.name}
-            </button>
-          )}
-
-          {/* Copy for pasting into a streaming app's search */}
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            <CopyButton
-              text={artist ? `${artist.name} - ${album.title}` : album.title}
-              label="Copy artist + album"
-            />
-            <CopyButton text={album.title} label="Copy album" />
-          </div>
-        </div>
-
-        {/* Two big facts */}
-        <div className="mt-5 flex items-stretch justify-center gap-3">
-          <div className="flyer aged flex-1 px-3 py-3 text-center">
-            <p className="font-display text-4xl leading-none text-ink">
-              {formatPlays(album.play_count)}
-            </p>
-            <p className="label text-ink-3 mt-1">total plays</p>
-          </div>
-          <div className="flyer aged flex-1 px-3 py-3 text-center">
-            <p className="font-display text-2xl leading-none text-ink">
-              {lastPlayed
-                ? relativeAge(new Date(lastPlayed).toISOString())
-                : 'a while'}
-            </p>
-            <p className="label text-ink-3 mt-1">last spun</p>
-          </div>
-        </div>
-
-        {tags.length > 0 && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {tags.slice(0, 6).map((t) => (
-              <Chip key={t.id} tone="olive" onClick={() => onOpenTag(t.id)}>
-                {t.name}
-              </Chip>
-            ))}
-          </div>
+      <div className="mt-5 px-4">
+        <h1 className="text-[1.9rem] break-words">{album.title}</h1>
+        {artist && (
+          <button
+            onClick={() => onOpenArtist(artist.id)}
+            className="mt-1 text-[1rem] font-semibold text-indigo underline-offset-2 active:underline"
+          >
+            {artist.name} ›
+          </button>
         )}
+        <div className="mt-3">
+          <CopyButton
+            text={artist ? `${artist.name} - ${album.title}` : album.title}
+            label="Copy to search"
+            className="sticker border-ink bg-sun px-3.5 py-1.5 text-[0.8rem]"
+          />
+        </div>
+      </div>
+
+      {tags.length > 0 && (
+        <div className="no-scrollbar mt-4 flex gap-1.5 overflow-x-auto px-4">
+          {tags.slice(0, 8).map((t) => (
+            <Chip key={t.id} onClick={() => onOpenTag(t.id)} className="shrink-0">
+              {t.name}
+            </Chip>
+          ))}
+        </div>
+      )}
+
+      {moreByArtist.length > 0 && artist && (
+        <CoverRow
+          title={`More from ${artist.name}`}
+          action={
+            <button onClick={() => onOpenArtist(artist.id)} className="shrink-0 text-[0.85rem] font-semibold text-indigo">
+              All
+            </button>
+          }
+        >
+          {moreByArtist.slice(0, 12).map((a) => (
+            <CoverTile
+              key={a.id}
+              title={a.title}
+              subtitle={a.track_count > 0 ? `${a.track_count} tracks` : undefined}
+              src={a.image_url}
+              onClick={() => onOpenAlbum(a.id)}
+              className="w-[30%] max-w-[9rem] shrink-0 snap-start"
+            />
+          ))}
+        </CoverRow>
+      )}
+
+      {kindred.length > 0 && (
+        <CoverRow title="Kindred records">
+          {kindred.map((a) => (
+            <CoverTile
+              key={a.id}
+              title={a.title}
+              subtitle={a.artistName}
+              src={a.image_url}
+              onClick={() => onOpenAlbum(a.id)}
+              className="w-[30%] max-w-[9rem] shrink-0 snap-start"
+            />
+          ))}
+        </CoverRow>
+      )}
+
+      <Disclosure title="Tracks, plays and notes">
+        <div className="flex gap-3">
+          <Fact value={formatPlays(album.play_count)} label="plays" />
+          <Fact
+            value={lastPlayed ? relativeAge(new Date(lastPlayed).toISOString()) : 'a while'}
+            label="last spun"
+          />
+        </div>
 
         {album.wiki_summary && (
-          <p className="mt-5 border-l-[3px] border-riso-red pl-3 text-sm leading-relaxed text-ink-2">
+          <p className="mt-4 text-sm leading-relaxed text-ink-2">
             {plainText(album.wiki_summary, 320)}
           </p>
         )}
 
-        {/* Tracklist */}
-        <h2 className="stamp-title mt-8 mb-3 text-[1.6rem]">Tracklist</h2>
+        <div className="mt-4">
+          <CopyButton text={album.title} label="Copy album" />
+        </div>
+
+        <h3 className="mt-5 mb-2 text-[1.15rem]">Tracklist</h3>
         {loadingTracks ? (
           <p className="label text-ink-3">reading the back cover…</p>
         ) : tracks.length === 0 ? (
-          <p className="label text-ink-3">
-            No tracklist on hand{' '}
-            <span className="normal-case tracking-normal">
-              (it lives on the home server)
-            </span>
-            .
-          </p>
+          <p className="label text-ink-3">No tracklist on hand (it lives on the home server).</p>
         ) : (
-          <ol className="divide-y divide-ink/20 border-y-[1.5px] border-ink">
+          <ol className="divide-y divide-kraft">
             {tracks.map((track, i) => (
               <li key={track.id} className="flex items-center gap-3 py-2">
-                <span className="font-display w-6 text-lg text-ink-3">{i + 1}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-ink">
-                  {track.title}
-                </span>
+                <span className="w-5 text-right text-sm text-ink-3 tabular-nums">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink">{track.title}</span>
                 {track.play_count > 0 && (
                   <span className="label text-ink-3">{formatPlays(track.play_count)}</span>
                 )}
                 {track.duration > 0 && (
-                  <span className="label text-ink-3 w-10 text-right tabular-nums">
+                  <span className="label w-10 text-right text-ink-3 tabular-nums">
                     {formatDuration(track.duration)}
                   </span>
                 )}
@@ -159,13 +192,16 @@ export function AlbumDetail({
             ))}
           </ol>
         )}
+      </Disclosure>
+    </div>
+  )
+}
 
-        {album.play_count > 0 && (
-          <div className="mt-6 flex justify-center">
-            <PlayBadge count={album.play_count} />
-          </div>
-        )}
-      </div>
+function Fact({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex-1 rounded-xl bg-paper-3 px-3 py-2.5">
+      <p className="text-[1.35rem] font-semibold leading-none text-ink">{value}</p>
+      <p className="label mt-1 text-ink-3">{label}</p>
     </div>
   )
 }

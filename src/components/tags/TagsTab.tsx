@@ -4,7 +4,7 @@ import { sortedTags } from '@/lib/derive'
 import { EmptyState } from '../ui'
 
 /* Rotate divider colours so the index reads like a box of index cards. */
-const EDGES = ['#c83f2b', '#5f6a2c', '#edb22a', '#2f5d6b', '#1b1712']
+const EDGES = ['#3a3f9e', '#ffc83d', '#2f7a45', '#dcddf7', '#22261c']
 
 export function TagsTab({
   data,
@@ -36,8 +36,7 @@ export function TagsTab({
               style={{ borderLeftColor: EDGES[i % EDGES.length] }}
             >
               <span
-                className="font-display text-2xl leading-none text-ink uppercase tracking-wide"
-                style={{ transform: `rotate(${(i % 3) - 1}deg)` }}
+                className="font-display text-xl italic font-semibold leading-tight text-ink"
               >
                 {tag.name}
               </span>

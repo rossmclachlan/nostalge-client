@@ -1,6 +1,6 @@
 # Nostalge — Architecture Overview
 
-Nostalge is a **mobile-first, offline-graceful PWA** for rediscovering a personal music library. It reads a Last.fm-derived collection from a self-hosted **PocketBase** backend that lives on a home LAN (only intermittently reachable), and presents it as a DIY-zine "record crate." It is a **fully static site** (Astro `output: 'static'`) hosted on **GitHub Pages**, with a single React island doing all the interactivity.
+Nostalge is a **mobile-first, offline-graceful PWA** for rediscovering a personal music library. It reads a Last.fm-derived collection from a self-hosted **PocketBase** backend that lives on a home LAN (only intermittently reachable), and presents it as an artwork-first "record crate." It is a **fully static site** (Astro `output: 'static'`) hosted on **GitHub Pages**, with a single React island doing all the interactivity.
 
 Live: `https://rossmclachlan.github.io/nostalge-client/`
 
@@ -23,8 +23,8 @@ Live: `https://rossmclachlan.github.io/nostalge-client/`
 ```
 src/
   pages/index.astro          Sole route; mounts <App client:only="react"> + hydration fallback
-  layouts/Layout.astro       <head>, Google Fonts, pre-paint theme script, PWA manifest link + SW registration
-  styles/global.css          Tailwind v4 import; @theme tokens; .dark overrides; zine component/utility classes
+  layouts/Layout.astro       <head>, Google Fonts, PWA manifest link + SW registration
+  styles/global.css          Tailwind v4 import; @theme tokens; component/utility classes
 
   lib/
     types.ts                 PocketBase collection shapes + local cache shapes + ConnectionState
@@ -45,8 +45,7 @@ src/
     BottomNav.tsx            Fixed 3-tab bottom nav (Tab type + ITEMS)
     Cover.tsx                Album/artist artwork with generated initials fallback + aged overlay
     SignIn.tsx               SignInGate (email/password card shown when a sync needs a session) + SignedInAs (sign-out link)
-    ThemeToggle.tsx          Light/dark flip (writes `nostalge:theme`, updates theme-color meta)
-    InstallButton.tsx        PWA install button gated on `beforeinstallprompt`
+        InstallButton.tsx        PWA install button gated on `beforeinstallprompt`
     CopyButton.tsx           Copy-to-clipboard (async API + execCommand fallback)
     DetailHeader.tsx         Sticky back-bar for detail views
     ui.tsx                   Shared primitives: SectionHeader, Chip, PlayBadge, SegmentedControl, EmptyState
@@ -89,7 +88,7 @@ Local cache shapes:
 - **`useRecentPlays()`** — same pattern with its own cache key and its own `needsSignIn`; also manual-refresh only. The Recent tab's status panel shows "signed in as … · sign out" (`SignedInAs`). Signing out keeps the cached library on the device.
 
 ### localStorage keys
-`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:theme` (`light`/`dark`) · `pocketbase_auth` (the SDK's session token, written by the SDK itself).
+`nostalge:data:v1` (library) · `nostalge:tracks:v1` (per-track play counts, written separately so a quota failure can't take the core library down) · `nostalge:recent:v1` (recent plays) · `nostalge:discovery:shown:v1` (recently-shown discovery card ids) · `nostalge:discover-view:v1` (`wall`/`stream`) · `pocketbase_auth` (the SDK's session token, written by the SDK itself).
 
 ## UI / navigation (`src/components/App.tsx`)
 - **Tabs** (`Tab` in `BottomNav.tsx`): `discovery | library | history`. Bottom-nav order: **Discover, Library, History**. Default tab: **discovery**. The grid is `grid-cols-3`. (A fourth tab, Sets, built playlists from a sentence via the Gemini API; it was removed because the Claude connector in `mcp-worker/` does that job now. App.tsx clears the localStorage keys it left behind.)
@@ -97,7 +96,8 @@ Local cache shapes:
 - **Section state lives in `App`, not in the tab components** (`librarySection`, `historySection`) — same reasoning as `discoverySeed`. A tab body unmounts when a detail is pushed, so state held inside it would be lost: drilling into an album from Tags and pressing Back would silently drop you on Crates. Switching section also scrolls to top, because it is a navigation.
 - **Navigation stack**: `stack: Detail[]`, `Detail = { kind: 'artist'|'album'|'tag'; id }`. When `stack` is non-empty, App renders the matching detail view (in a `max-w-2xl` readable column) instead of the tab body; `back` pops. `changeTab` clears the stack, sets the tab, re-rolls the discovery seed when entering Discovery, scrolls to top.
 - **`discoverySeed`** lives in `App` (not in `DiscoveryTab`) so the Discovery selection **survives drilling into a detail and pressing Back**; it re-rolls only on deliberate tab entry or Shuffle.
-- **Masthead**: "Nostalge" kicker + tab title, a `ConnectionFlag` (syncing / live / "off the shelf" / "no signal"), plus `InstallButton`, `ThemeToggle`, and a spin-while-syncing Refresh button.
+- **Masthead**: the Homegrown seal + the `nostalge` wordmark on Discover (with the Wall / Stream `ViewToggle`), or the tab title elsewhere, plus `InstallButton` and a spin-while-syncing Refresh button whose small dot shows the connection (live / "off the shelf" / "no signal").
+- **`discoveryView`** (`'wall' | 'stream'`, default Wall) lives in `App` and is saved under `nostalge:discover-view:v1`.
 - **Responsive**: full-width container; grids scale 2 → sm:3 → md/lg:4–5 → xl:6 columns; detail pages capped at `max-w-2xl`.
 
 ## Discovery engine (`src/lib/discovery/`)
@@ -106,16 +106,18 @@ The Discovery tab is a **data engine kept separate from the UI**.
 - `cards.ts` — `GENERATORS`, **32 total: 22 active, 10 dormant** (`() => null`). A generator returns a `DiscoveryCard` (headline, subheadline, optional big `metric`, 1–6 albums, CTA, `narrativeScore`), an array of cards (the tag/year families emit several per deal), or `null` to be skipped.
   - **Active** (from cached albums/artists/plays): On This Day, This Month That Year, Late Night, Morning Stack, Weekend, Sunday, Almost There, Century Club, First Listen Flashback, Forgotten Gems, Long Hiatus, One Summer, Fading Favourites, Fast Burner (plays/yr — *ownership proxied by first cached play*), The B-Side, The Grower, plus the non-recency families: Genre Spotlight (×3, rotating tag), Lucky Dip (×2, random pull from a rotating tag crate), Blind Pull (6 random sleeves), Class of YYYY (×2, year of first cached play), Pressed in YYYY (×2, Last.fm year tags as release years), The Underplayed, The Completist.
   - **Dormant** (wired in, always `null` until backend data exists): One Hit Wonders, Deep Cut Ratio, Never Finished, All Killer (need **per-track plays** — tracks aren't cached); From Somewhere New (no **artist country**); Decade Deep Dive (no **release year**); Short and Sweet, Commitment Test (no cached **album duration**); Loved But Unplayed, Sleeper Loved (no **"loved"** field).
-- `DiscoveryTab.tsx` — runs the engine via `useMemo([data, seed])`, renders the selected `DiscoveryCard`s, Shuffle button (`onReroll` re-seeds), and a "come back soon" empty state when `< 3` cards have data.
-- `DiscoveryCard.tsx` — **the artwork is the card.** One album gets a large hero sleeve; several become a horizontal snap-scrolling strip that bleeds to the card edges so the next sleeve peeks in (that peek is the scroll affordance). The strip needs `scroll-pl-4` as well as `px-4`: without it the snapport starts at the padding edge and the first sleeve snaps flush to the card border instead of aligning with the headline. The category label and the metric sticker share one line, because the sticker used to be a block of its own and cost the artwork a chunk of height. There is **no CTA button** — the sleeves are the affordance — and the `cta` field has been removed from the card model accordingly.
+- `DiscoveryTab.tsx` — runs the engine via `useMemo([data, seed])`, renders the Wall or the Stream, a sun pebble Shuffle button (`onReroll` re-seeds), and a "come back soon" empty state when `< 3` cards have data.
+- `DiscoveryWall.tsx` — **the default view.** Every card's albums (up to 6 each, de-duplicated) laid out as one dense mosaic of sleeves. Each card's first sleeve wears a small lens sticker with the card headline; every third card opens on a 2×2 tile, alternating sides. Titles show on hover, or on press-and-hold (350 ms) on touch; a tap opens the record.
+- `DiscoveryCard.tsx` — one card in the **Stream** view. The headline is a small lens sticker; the subheadline waits behind a "why?" button and the metric is no longer shown (numbers live on the record page). One album gets a full-width hero sleeve; several become a horizontal snap-scrolling strip that bleeds to the screen edge so the next sleeve peeks in. The strip needs `scroll-pl-4` as well as `px-4`, or the first sleeve snaps flush to the edge. There is **no CTA button**: the sleeves are the affordance.
 
 > **Highest-value data-layer extension:** caching track-level plays would unlock the 4 per-track cards without any backend schema change. Country/year/duration/loved need new backend fields.
 
 ## Theming / design system (`src/styles/global.css`)
-- **Tokens in `@theme`**: paper/ink palette (`--color-paper*`, `--color-ink*`, `--color-kraft`), riso accents (`--color-riso-red/olive/yellow/blue`), fonts (`--font-display` Bebas Neue, `--font-body` Archivo — loaded via Google Fonts in `Layout.astro`), `--radius-sticker`, `--shadow-ink`, `--nav-active-bg`.
-- **Dark mode is a token swap**, not per-component variants. A `.dark {}` block overrides those custom properties; every component consumes token colors (`bg-paper`, `text-ink`, `border-ink`, etc.), so one class flip re-themes the whole app. `--shadow-ink` and `--nav-active-bg` are themed so the hard offset shadows and the selected-tab block still read on dark. `.dark .sleeve-blend` disables the multiply blend so cover art doesn't crush to black.
-- **Zine component classes**: `.stamp-title`, `.label`, `.flyer` (hard border + offset shadow), `.aged::after` (multiply noise), `.price-sticker`, `.btn-press` (shadow collapses on `:active`), `.divider-card`. Utilities: `.tilt-l/.tilt-r`, `.pb-safe`, `.sleeve-blend`, `.card-in` (entrance anim, disabled under `prefers-reduced-motion`). Body has layered radial toner gradients + inline SVG grain.
-- **Toggle**: pre-paint inline script in `Layout.astro` applies saved/system theme (avoids flash); `ThemeToggle.tsx` flips the `dark` class + persists + updates `theme-color` meta.
+- **Nostalge is a flavor of the Homegrown household brand** (shared with Mise and Priorities): soil ink `#22261C`, sun `#FFC83D`, Bricolage Grotesque body, sticker buttons, the scalloped seal (`Seal.tsx`) and the pebble button. Nostalge's own crop is indigo `#3A3F9E`, lavender `#DCDDF7`, sleeve paper `#F5F0E6` and Fraunces (soft, wonky italic) for headings.
+- **Artwork first.** Sleeves are never framed, tilted or written over (`Cover.tsx` draws no border or overlay). Each record gets one line of title and one of artist (`CoverTile`); play counts and notes sit one tap deeper, inside the record and artist pages' `Disclosure`. Stickers, grain and tilt stay on the paper.
+- **Light only.** There is no dark mode or theme toggle; App.tsx clears the old `nostalge:theme` key.
+- **Tokens in `@theme`**: `--color-paper` (sleeve), `-paper-2` (shelf, raised surfaces), `-paper-3` (pressed/tinted), `--color-kraft` (soft outlines), `--color-ink*`, `--color-sun`, `--color-indigo`, `--color-lavender`. The older `--color-riso-*` names are kept and mapped onto the flavor (red → indigo for links, olive → good green, yellow → sun). Fonts are loaded via Google Fonts in `Layout.astro`.
+- **Component classes**: `.stamp-title`, `.label`, `.flyer` (soft shelf card), `.price-sticker` (sun count), `.btn-press` (soft pill), `.sticker` (soil outline + hard offset shadow, presses flat), `.lens` (discovery lens sticker), `.pebble`, `.divider-card`. Utilities: `.sleeve-lift`, `.pb-safe`, `.card-in` (entrance anim, disabled under `prefers-reduced-motion`). `.aged` is a no-op kept for old markup.
 
 ## PWA / service worker
 - `@vite-pwa/astro` with `registerType: 'autoUpdate'`, `injectRegister: false`. Because vite-plugin-pwa's HTML injection doesn't run on Astro's generated pages, the **manifest link and SW registration are hand-wired in `Layout.astro`** (base-path aware).
@@ -133,6 +135,6 @@ The Discovery tab is a **data engine kept separate from the UI**.
 - **Add a tab**: extend the `Tab` union + `ITEMS` in `BottomNav.tsx`, add a title in `App.tsx`'s `TAB_TITLES`, render it in the tab switch, and bump `grid-cols-N` to match. Four is still roomy on a 390px phone. Before adding one, check whether the new view is really a new *intent* or just another view of an existing one — if it's the latter it belongs behind a `SegmentedControl` in the tab that already owns that intent.
 - **Add a discovery card**: write a `CardGenerator` in `cards.ts` returning a `DiscoveryCard | null` and add it to `GENERATORS`. Enforce "enough data" inside the generator and return `null` otherwise.
 - **New PocketBase field**: add it to the interface in `types.ts`, fetch it in `pb.ts` (respect the caps + `requestKey: null`), and it flows through the cache automatically.
-- **Colors**: only touch `@theme` and the `.dark` block; never hardcode hex in components — use token utilities so dark mode keeps working.
+- **Colors**: only touch `@theme`; never hardcode hex in components, use token utilities.
 - **Base path**: any new public asset URL must go through `import.meta.env.BASE_URL` (see `Layout.astro`) so it resolves under `/nostalge-client/`.
 - Data reads must stay silent-failing and cache-first; **do not** reintroduce auto-sync on load (it was deliberately removed).

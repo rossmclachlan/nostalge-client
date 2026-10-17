@@ -1,71 +1,99 @@
 import { useMemo } from 'react'
 import { useRecentPlays } from '@/lib/useRecentPlays'
-import type { RecentPlay } from '@/lib/types'
+import type { MusicData, RecentPlay } from '@/lib/types'
 import { clockTime, dayHeading, relativeAge } from '@/lib/format'
 import { EmptyState } from '../ui'
-import { ClockIcon, RefreshIcon } from '../icons'
+import { RefreshIcon } from '../icons'
+import { CoverTile } from '../CoverTile'
 import { SignedInAs, SignInGate } from '../SignIn'
 import { cn } from '@/lib/cn'
 
-export function RecentTab() {
+/** One record spun in a sitting: consecutive plays of the same album fold into it. */
+interface Spin {
+  key: string
+  title: string
+  artist: string
+  /** time of the most recent play in the run */
+  at: string
+  albumId?: string
+  imageUrl?: string
+}
+
+export function RecentTab({
+  data,
+  onOpenAlbum,
+}: {
+  data: MusicData
+  onOpenAlbum: (id: string) => void
+}) {
   const { plays, connection, syncing, needsSignIn, refresh } = useRecentPlays()
 
-  // Group consecutive plays under day headings (already newest-first).
-  const groups = useMemo(() => {
-    const out: { day: string; items: RecentPlay[] }[] = []
+  // Scrobbles only carry names, so find each record's sleeve by artist + album.
+  const albumByName = useMemo(() => {
+    const artistName = new Map(data.artists.map((a) => [a.id, a.name.toLowerCase()]))
+    const map = new Map<string, { id: string; image_url: string }>()
+    for (const al of data.albums) {
+      map.set(`${artistName.get(al.artist) ?? ''}|${al.title.toLowerCase()}`, al)
+    }
+    return map
+  }, [data])
+
+  // Day headings, then the records spun that day (plays are newest-first).
+  const days = useMemo(() => {
+    const out: { day: string; spins: Spin[] }[] = []
+    let prev: RecentPlay | undefined
     for (const p of plays) {
       const day = dayHeading(p.at)
-      const last = out[out.length - 1]
-      if (last && last.day === day) last.items.push(p)
-      else out.push({ day, items: [p] })
+      let group = out[out.length - 1]
+      if (!group || group.day !== day) {
+        group = { day, spins: [] }
+        out.push(group)
+        prev = undefined
+      }
+      const sameRecord =
+        prev && p.album && prev.album === p.album && prev.artist === p.artist
+      if (!sameRecord) {
+        const hit = albumByName.get(`${p.artist.toLowerCase()}|${p.album.toLowerCase()}`)
+        group.spins.push({
+          key: p.id,
+          title: p.album || p.track,
+          artist: p.artist,
+          at: p.at,
+          albumId: hit?.id,
+          imageUrl: hit?.image_url,
+        })
+      }
+      prev = p
     }
     return out
-  }, [plays])
+  }, [plays, albumByName])
 
   const newest = plays[0]?.at
 
   return (
     <div>
-      {/* Sync status panel — the whole point of this tab */}
-      <div className="flyer aged mb-6 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="label text-riso-red mb-1">last scrobble</p>
-            <p className="font-display text-3xl leading-none text-ink">
-              {newest ? relativeAge(newest) : '—'}
-            </p>
-            {newest && (
-              <p className="label text-ink-3 mt-1.5">
-                {dayHeading(newest)} · {clockTime(newest)}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={refresh}
-            disabled={syncing}
-            className="btn-press grid h-10 w-10 shrink-0 place-items-center disabled:opacity-50"
-            aria-label="Check sync now"
-          >
-            <RefreshIcon className={cn('h-4 w-4', syncing && 'animate-spin')} />
-          </button>
-        </div>
-
-        <div className="mt-3 flex items-center gap-2">
-          <SyncFlag connection={connection} syncing={syncing} />
-          <p className="label text-ink-3">
-            {syncing
-              ? 'checking the NAS…'
-              : needsSignIn
-                ? 'the NAS answered · sign in to pull fresh plays'
-                : connection === 'live'
-                ? 'pulled fresh from the server'
-                : connection === 'cached'
-                  ? 'showing last saved · tap ↻ to check the NAS'
-                  : 'tap ↻ to check the NAS'}
-          </p>
-        </div>
-        <SignedInAs />
+      {/* Sync status: still here, just smaller than the art. */}
+      <div className="mb-5 flex items-center gap-3 rounded-2xl bg-paper-3 py-2 pl-4 pr-1.5">
+        <SyncDot connection={connection} syncing={syncing} />
+        <p className="min-w-0 flex-1 text-[0.8rem] leading-snug text-ink-2">
+          {syncing
+            ? 'Checking the NAS…'
+            : newest
+              ? `Last scrobble ${relativeAge(newest)}, ${clockTime(newest)}`
+              : 'No scrobbles yet'}
+          {!syncing && needsSignIn && ' · sign in to pull fresh plays'}
+          {!syncing && !needsSignIn && connection === 'cached' && ' · saved copy'}
+        </p>
+        <button
+          onClick={refresh}
+          disabled={syncing}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink active:bg-paper disabled:opacity-50"
+          aria-label="Check sync now"
+        >
+          <RefreshIcon className={cn('h-[18px] w-[18px]', syncing && 'animate-spin')} />
+        </button>
       </div>
+      <SignedInAs />
 
       {needsSignIn && <SignInGate onSignedIn={refresh} />}
 
@@ -75,32 +103,43 @@ export function RecentTab() {
           body="No recent scrobbles to show. If the NAS sync is running, they'll appear here the next time the server is reachable."
         />
       ) : (
-        <div className="space-y-6">
-          {groups.map((group) => (
-            <section key={group.day}>
-              <div className="mb-2 flex items-center gap-2">
-                <ClockIcon className="h-3.5 w-3.5 text-ink-3" />
-                <h2 className="label text-ink-2">{group.day}</h2>
-                <span className="h-px flex-1 bg-ink/20" />
+        <div className="mt-2 space-y-7">
+          {days.map(({ day, spins }, i) => (
+            <section key={day}>
+              <div className="mb-2.5 flex items-center gap-2">
+                <h2 className="text-[1.35rem]">{day}</h2>
+                {i === 0 && (
+                  <span className="price-sticker text-[0.7rem]">
+                    {spins.length} {spins.length === 1 ? 'record' : 'records'}
+                  </span>
+                )}
               </div>
-              <ul className="border-y-[1.5px] border-ink divide-y divide-ink/15">
-                {group.items.map((p) => (
-                  <li key={p.id} className="flex items-baseline gap-3 py-2">
-                    <span className="label text-ink-3 w-11 shrink-0 tabular-nums">
-                      {clockTime(p.at)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-ink">
-                        {p.track}
-                      </span>
-                      <span className="block truncate text-xs text-ink-3">
-                        {p.artist}
-                        {p.album ? ` · ${p.album}` : ''}
-                      </span>
-                    </span>
-                  </li>
+              {/* The latest day gets big sleeves; earlier days pack tighter. */}
+              <div
+                className={cn(
+                  'grid',
+                  i === 0
+                    ? 'grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-4'
+                    : 'grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-6 lg:grid-cols-8',
+                )}
+              >
+                {spins.map((s) => (
+                  <CoverTile
+                    key={s.key}
+                    title={s.title}
+                    subtitle={s.artist}
+                    src={s.imageUrl}
+                    onClick={() => s.albumId && onOpenAlbum(s.albumId)}
+                    badge={
+                      i === 0 ? (
+                        <span className="absolute bottom-1.5 right-1.5 rounded-full bg-ink px-2 py-0.5 text-[0.68rem] font-bold text-paper-2">
+                          {clockTime(s.at)}
+                        </span>
+                      ) : undefined
+                    }
+                  />
                 ))}
-              </ul>
+              </div>
             </section>
           ))}
         </div>
@@ -109,23 +148,23 @@ export function RecentTab() {
   )
 }
 
-function SyncFlag({
+function SyncDot({
   connection,
   syncing,
 }: {
   connection: 'live' | 'cached' | 'empty'
   syncing: boolean
 }) {
-  if (syncing) return <span className="label text-ink-3">syncing…</span>
-  const map = {
-    live: { text: 'live', cls: 'bg-riso-olive text-paper' },
-    cached: { text: 'cached', cls: 'bg-riso-yellow text-ink' },
-    empty: { text: 'no signal', cls: 'bg-ink text-paper' },
-  } as const
-  const f = map[connection]
+  const cls = syncing
+    ? 'bg-paper-2 animate-pulse'
+    : { live: 'bg-riso-olive', cached: 'bg-sun', empty: 'bg-ink-3' }[connection]
+  const label = syncing ? 'syncing' : { live: 'live', cached: 'cached', empty: 'no signal' }[connection]
   return (
-    <span className={cn('label border-[1.5px] border-ink px-1.5 py-[2px] leading-none', f.cls)}>
-      {f.text}
-    </span>
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cn('h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px] border-ink', cls)}
+    />
   )
 }

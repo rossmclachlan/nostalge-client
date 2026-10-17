@@ -1,6 +1,6 @@
 import { BackIcon } from './icons'
 
-/** Sticky back bar for full-screen detail views. */
+/** Sticky back button for full-screen detail views. */
 export function DetailHeader({
   title,
   onBack,
@@ -9,15 +9,18 @@ export function DetailHeader({
   onBack: () => void
 }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b-[1.5px] border-ink bg-paper-2 px-3 py-2.5">
+    <header
+      className="sticky top-0 z-20 flex items-center gap-2 bg-paper/90 px-2 pb-1.5 backdrop-blur"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.375rem)' }}
+    >
       <button
         onClick={onBack}
         aria-label="Back"
-        className="btn-press grid h-9 w-9 place-items-center"
+        className="grid h-11 w-11 place-items-center rounded-full text-ink active:bg-paper-3"
       >
-        <BackIcon className="h-5 w-5" />
+        <BackIcon className="h-[22px] w-[22px]" />
       </button>
-      <span className="label text-ink-2">{title}</span>
+      <span className="label text-ink-3">{title}</span>
     </header>
   )
 }
