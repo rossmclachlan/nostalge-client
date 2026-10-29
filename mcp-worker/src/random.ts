@@ -11,6 +11,9 @@
 import { fold } from "./matching";
 import { isRecordId, type PocketBase, PocketBaseError, pbString } from "./pocketbase";
 import { deepHistoryFilter, deepHistoryMark } from "./deep-history";
+import { type AlbumRec, release } from "./library";
+import { resolveTags } from "./tags";
+import { type YearRange, yearFilter } from "./year-filter";
 
 const YEAR_TAG = /^(19|20)\d\d$/;
 const OVERSAMPLE = 3;
@@ -40,6 +43,10 @@ export type RandomOptions = {
 	max_duration_s?: number;
 	min_year?: number;
 	max_year?: number;
+	/** YYYY-MM-DD, inclusive; the song's latest play across its records */
+	last_played_from?: string;
+	last_played_to?: string;
+	exclude_artists?: string[];
 	deep_history?: boolean;
 };
 
@@ -59,6 +66,54 @@ async function artistId(pb: PocketBase, artist: string): Promise<{ id: string; n
 	if (res.items.length === 0) throw new PocketBaseError(`No artist matching ${JSON.stringify(artist)} in the library`, 404);
 	throw new PocketBaseError(`Several artists match ${JSON.stringify(artist)}: ${res.items.map((x) => `${x.name} (${x.id})`).join(", ")}`, 400);
 }
+
+/**
+ * Artist names or ids to leave out. Lenient, unlike artistId: a name with no
+ * exact (case-insensitive) match and not exactly one partial match is reported
+ * back instead of failing the call.
+ */
+async function excludedArtists(pb: PocketBase, names: string[]): Promise<{ ids: string[]; names: string[]; unresolved: string[] }> {
+	const ids: string[] = [];
+	const found: string[] = [];
+	const unresolved: string[] = [];
+	await Promise.all(
+		[...new Set(names.map((n) => n.trim()).filter(Boolean))].map(async (raw) => {
+			if (isRecordId(raw)) {
+				ids.push(raw);
+				found.push(raw);
+				return;
+			}
+			const res = await pb.list<{ id: string; name: string }>("artists", {
+				filter: `name~${pbString(raw)}`,
+				fields: "id,name",
+				perPage: 50,
+				skipTotal: true,
+			});
+			// Duplicate artist records can share a name: leave them all out.
+			const exact = res.items.filter((x) => x.name.toLowerCase() === raw.toLowerCase());
+			const hits = exact.length ? exact : res.items.length === 1 ? res.items : [];
+			if (hits.length === 0) unresolved.push(raw);
+			for (const h of hits) ids.push(h.id);
+			if (hits.length) found.push(hits[0].name);
+		}),
+	);
+	return { ids, names: found, unresolved };
+}
+
+/** Filter clauses leaving out the excluded artists, plus what to report back. */
+export async function excludeArtistsFilter(pb: PocketBase, names: string[] | undefined, field = "artist") {
+	if (!names?.length) return { where: [] as string[], report: {} };
+	const ex = await excludedArtists(pb, names);
+	return {
+		where: ex.ids.map((id) => `${field}!=${pbString(id)}`),
+		report: {
+			...(ex.names.length ? { excluded_artists: ex.names } : {}),
+			...(ex.unresolved.length ? { unresolved_exclude_artists: ex.unresolved } : {}),
+		},
+	};
+}
+
+const day = (d: string, end: boolean) => `${d} ${end ? "23:59:59.999Z" : "00:00:00.000Z"}`;
 
 async function tagIds(pb: PocketBase, names: string[]): Promise<{ ids: string[]; unknown: string[] }> {
 	const ids: string[] = [];
@@ -120,7 +175,20 @@ export async function randomTracks(pb: PocketBase, o: RandomOptions) {
 	if (years) where.push(years);
 	const deep = deepHistoryFilter(o.deep_history);
 	if (deep) where.push(deep);
+	const excluded = await excludeArtistsFilter(pb, o.exclude_artists);
+	where.push(...excluded.where);
+	// Last played: per record here, then per song below (another record of the
+	// same song may have been played more recently than last_played_to).
+	const lastTo = o.last_played_to ? day(o.last_played_to, true) : null;
+	if (o.last_played_from && o.last_played_to && o.last_played_from > o.last_played_to) {
+		throw new PocketBaseError(`last_played_from (${o.last_played_from}) is after last_played_to (${o.last_played_to})`, 400);
+	}
+	if (o.last_played_from || lastTo) where.push('last_played_at!=""');
+	if (o.last_played_from) where.push(`last_played_at>=${pbString(day(o.last_played_from, false))}`);
+	if (lastTo) where.push(`last_played_at<=${pbString(lastTo)}`);
 	const filter = where.join(" && ");
+	// PocketBase returns dates as "YYYY-MM-DD HH:MM:SS.sssZ", so they compare as strings.
+	const playedTooRecently = (song: TrackRec[]) => lastTo !== null && song.some((s) => s.last_played_at && s.last_played_at > lastTo);
 
 	const picked = new Map<string, { song: TrackRec[]; first: TrackRec }>();
 	// Songs sampled but not kept; used only if the rounds run out before `count` is reached.
@@ -154,6 +222,7 @@ export async function randomTracks(pb: PocketBase, o: RandomOptions) {
 			const key = songKey(t);
 			if (picked.has(key) || picked.size >= count) continue;
 			const song = bySong.get(key) ?? [t];
+			if (playedTooRecently(song)) continue;
 			// When the sample already covers everything that matches, keep every song once.
 			if (exhausted || Math.random() < 1 / song.length) {
 				picked.set(key, { song, first: t });
@@ -188,7 +257,57 @@ export async function randomTracks(pb: PocketBase, o: RandomOptions) {
 		count: tracks.length,
 		...(artist ? { artist: artist.name } : {}),
 		...(unknown.length ? { unknown_tags: unknown } : {}),
+		...excluded.report,
 		...(tracks.length < count ? { note: `Only ${tracks.length} distinct songs match these filters.` } : {}),
 		tracks,
+	};
+}
+
+export type RandomAlbumOptions = YearRange & {
+	count?: number;
+	tags?: string[];
+	match_all?: boolean;
+	min_plays?: number;
+	max_plays?: number;
+	exclude_artists?: string[];
+	deep_history?: boolean;
+};
+
+/** N random releases (albums) carrying any (or all) of the tags, with the other filters. */
+export async function randomAlbums(pb: PocketBase, o: RandomAlbumOptions) {
+	const count = Math.max(1, Math.min(o.count ?? 5, 25));
+	const where: string[] = [];
+	let found: { id: string; name: string }[] = [];
+	let unknown: string[] = [];
+	if (o.tags?.length) {
+		({ found, unknown } = await resolveTags(pb, o.tags));
+		if (found.length === 0 || (o.match_all && unknown.length)) {
+			return { count: 0, albums: [], unknown_tags: unknown, message: "No album can match: unknown tags." };
+		}
+		where.push(`(${found.map((t) => `tag_relations~${pbString(t.id)}`).join(o.match_all ? " && " : " || ")})`);
+	}
+	if (o.min_plays !== undefined) where.push(`play_count>=${o.min_plays}`);
+	if (o.max_plays !== undefined) where.push(`play_count<=${o.max_plays}`);
+	const years = await yearFilter(pb, o);
+	if (years) where.push(years);
+	const deep = deepHistoryFilter(o.deep_history);
+	if (deep) where.push(deep);
+	const excluded = await excludeArtistsFilter(pb, o.exclude_artists);
+	where.push(...excluded.where);
+
+	const res = await pb.list<AlbumRec>("albums", {
+		filter: where.join(" && "),
+		sort: "@random",
+		expand: "artist,tag_relations",
+		perPage: count,
+		skipTotal: true,
+	});
+	return {
+		count: res.items.length,
+		...(found.length ? { tags: found.map((t) => t.name), match_all: !!o.match_all } : {}),
+		...(unknown.length ? { unknown_tags: unknown } : {}),
+		...excluded.report,
+		...(res.items.length < count ? { note: `Only ${res.items.length} albums match these filters.` } : {}),
+		albums: res.items.map(release),
 	};
 }
