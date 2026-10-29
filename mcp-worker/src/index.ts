@@ -2,12 +2,12 @@ import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { getArtist } from "./artist";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
-import { artistsByTag, listTags, TAG_TRACK_SORTS, tracksByTag } from "./tags";
+import { artistsByTag, listTags, TAG_LIST_SORTS, TAG_TRACK_SORTS, tracksByTag } from "./tags";
 import { z } from "zod";
 import { GitHubHandler } from "./github-handler";
 import { findTracks, getCrate, listCrates, releasesByTag, searchLibrary, TRACK_SORTS } from "./library";
 import { createTidalPlaylist } from "./playlist";
-import { randomTracks } from "./random";
+import { randomAlbums, randomTracks } from "./random";
 import { DEEP_HISTORY_NOTE, deepHistoryParam } from "./deep-history";
 import { PocketBase } from "./pocketbase";
 import { Budget, connectionStatus, startLogin, Tidal } from "./tidal";
@@ -127,14 +127,23 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				this.run("get_artist", { artist, include_tracks }, () => getArtist(this.pb(), artist, { include_tracks })),
 		);
 
+		const tagListSort = z
+			.enum(Object.keys(TAG_LIST_SORTS) as [keyof typeof TAG_LIST_SORTS, ...(keyof typeof TAG_LIST_SORTS)[]])
+			.optional()
+			.describe("most_played (default), least_played, recently_added (newest to the library first) or random (a fresh sample each call; page doesn't apply)");
+		const tagListPage = z.number().int().min(1).optional().describe("Page number (default 1)");
+
 		this.server.tool(
 			"releases_by_tag",
-			"List releases (albums) carrying a genre/mood/era tag, e.g. 'shoegaze' or '90s'. Tag names are case-insensitive.",
+			`List releases (albums) carrying a genre/mood/era tag, e.g. 'shoegaze' or '90s'. Tag names are case-insensitive. Sort by plays, by when they were added, or randomly. Paginated. ${DEEP_HISTORY_NOTE}`,
 			{
 				tag: z.string().min(1).max(100).describe("Tag name"),
-				limit: z.number().int().min(1).max(200).optional().describe("Max releases (default 50)"),
+				sort: tagListSort,
+				limit: z.number().int().min(1).max(200).optional().describe("Releases per page (default 50)"),
+				page: tagListPage,
+				deep_history: deepHistoryParam,
 			},
-			async ({ tag, limit }) => this.run("releases_by_tag", { tag, limit }, () => releasesByTag(this.pb(), tag, limit)),
+			async ({ tag, ...o }) => this.run("releases_by_tag", { tag, ...o }, () => releasesByTag(this.pb(), tag, o)),
 		);
 
 		this.server.tool(
@@ -151,12 +160,15 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 		this.server.tool(
 			"artists_by_tag",
-			"List artists carrying a tag (e.g. 'shoegaze'), most played first. Tag names are case-insensitive.",
+			`List artists carrying a tag (e.g. 'shoegaze'). Tag names are case-insensitive. Sort by plays, by when they were added, or randomly. Paginated. ${DEEP_HISTORY_NOTE}`,
 			{
 				tag: z.string().min(1).max(100).describe("Tag name"),
-				limit: z.number().int().min(1).max(200).optional().describe("Max artists (default 50)"),
+				sort: tagListSort,
+				limit: z.number().int().min(1).max(200).optional().describe("Artists per page (default 50)"),
+				page: tagListPage,
+				deep_history: deepHistoryParam,
 			},
-			async ({ tag, limit }) => this.run("artists_by_tag", { tag, limit }, () => artistsByTag(this.pb(), tag, limit)),
+			async ({ tag, ...o }) => this.run("artists_by_tag", { tag, ...o }, () => artistsByTag(this.pb(), tag, o)),
 		);
 
 		this.server.tool(
@@ -166,7 +178,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				tags: z.array(z.string().min(1).max(100)).min(1).max(10).describe("Tag names"),
 				match_all: z.boolean().optional().describe("true: every tag must match; false (default): any tag"),
 				deep_history: deepHistoryParam,
-				sort: z.enum(Object.keys(TAG_TRACK_SORTS) as [keyof typeof TAG_TRACK_SORTS, ...(keyof typeof TAG_TRACK_SORTS)[]]).optional().describe("most_played (default), recently_played or least_played"),
+				sort: z.enum(Object.keys(TAG_TRACK_SORTS) as [keyof typeof TAG_TRACK_SORTS, ...(keyof typeof TAG_TRACK_SORTS)[]]).optional().describe("most_played (default), least_played, recently_played, recently_added (newest first play first: most tracks were bulk-imported, so the first play stands in for 'added') or random (a fresh sample each call; page doesn't apply)"),
 				limit: z.number().int().min(1).max(100).optional().describe("Tracks per page (default 25)"),
 				page: z.number().int().min(1).optional().describe("Page number (default 1)"),
 			},
@@ -174,6 +186,11 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 		);
 
 		const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");
+		const excludeArtists = z
+			.array(z.string().min(1).max(200))
+			.max(50)
+			.optional()
+			.describe("Artist names (case-insensitive) or ids to leave out; names that match no artist are listed back as unresolved_exclude_artists");
 		this.server.tool(
 			"find_tracks",
 			[
@@ -208,7 +225,7 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 		this.server.tool(
 			"random_tracks",
-			`Pick N random songs from the library, optionally by artist, tags (any), play count, length, release year or deep history. Every matching song is equally likely (duplicate track records are accounted for). Use it instead of fetching everything and choosing. ${DEEP_HISTORY_NOTE}`,
+			`Pick N random songs from the library, optionally by artist, tags (any), play count, length, release year, when last played or deep history, leaving out given artists. Every matching song is equally likely (duplicate track records are accounted for). Use it instead of fetching everything and choosing. For "loved but not played in years", combine min_plays with last_played_to. ${DEEP_HISTORY_NOTE}`,
 			{
 				count: z.number().int().min(1).max(50).optional().describe("How many songs (default 10)"),
 				artist: z.string().min(1).max(200).optional().describe("Artist name (case-insensitive) or id"),
@@ -219,9 +236,29 @@ export class NostalgeMCP extends McpAgent<Env, Record<string, never>, Props> {
 				max_duration_s: z.number().int().min(1).optional().describe("Maximum length in seconds"),
 				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year"),
 				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year"),
+				last_played_from: isoDate.optional().describe("Last played on or after (YYYY-MM-DD)"),
+				last_played_to: isoDate.optional().describe("Not played since this date: last played on or before (YYYY-MM-DD). Never-played songs are left out"),
+				exclude_artists: excludeArtists,
 				deep_history: deepHistoryParam,
 			},
 			async (opts) => this.run("random_tracks", opts, () => randomTracks(this.pb(), opts)),
+		);
+
+		this.server.tool(
+			"random_albums",
+			`Pick N random releases (albums), optionally carrying any (or all) of the given tags, by play count, release year or deep history, leaving out given artists. Use get_crate for a pick's tracklist. ${DEEP_HISTORY_NOTE}`,
+			{
+				count: z.number().int().min(1).max(25).optional().describe("How many albums (default 5)"),
+				tags: z.array(z.string().min(1).max(100)).max(10).optional().describe("Albums with any of these tags (case-insensitive)"),
+				match_all: z.boolean().optional().describe("true: every tag must match; false (default): any tag"),
+				min_plays: z.number().int().min(0).optional().describe("At least this many plays"),
+				max_plays: z.number().int().min(0).optional().describe("At most this many plays (0 = never played)"),
+				min_year: z.number().int().min(1900).max(2099).optional().describe("Released in or after this year"),
+				max_year: z.number().int().min(1900).max(2099).optional().describe("Released in or before this year"),
+				exclude_artists: excludeArtists,
+				deep_history: deepHistoryParam,
+			},
+			async (opts) => this.run("random_albums", opts, () => randomAlbums(this.pb(), opts)),
 		);
 
 		this.server.tool(

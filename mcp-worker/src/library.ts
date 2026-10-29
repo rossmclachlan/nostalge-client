@@ -19,6 +19,7 @@
 import { type PocketBase, PocketBaseError, pbString } from "./pocketbase";
 import { type YearRange, yearFilter } from "./year-filter";
 import { deepHistoryFilter, deepHistoryMark } from "./deep-history";
+import { resolveTags, type TagListOptions, tagListPaging } from "./tags";
 
 type Base = { id: string; created: string; updated: string };
 type TagRec = Base & { name: string; slug: string; usage_count: number };
@@ -28,7 +29,7 @@ type ArtistRec = Base & {
 	tag_relations: string[];
 	expand?: { tag_relations?: TagRec[] };
 };
-type AlbumRec = Base & {
+export type AlbumRec = Base & {
 	title: string;
 	artist: string;
 	release_year: number;
@@ -92,7 +93,7 @@ async function tracksWithYears(pb: PocketBase): Promise<(t: TrackRec) => ReturnT
 	return (t) => ({ ...track(t), ...albumYear(t.expand?.album, byId) });
 }
 
-function release(a: AlbumRec) {
+export function release(a: AlbumRec) {
 	return {
 		id: a.id,
 		title: a.title,
@@ -220,28 +221,18 @@ export async function getCrate(pb: PocketBase, crateId: string) {
 	};
 }
 
-export async function releasesByTag(pb: PocketBase, tag: string, limit?: number) {
-	const t = tag.trim();
-	// "=" is case-sensitive in PocketBase; also accept the slug, then a case-insensitive "~" match.
-	let tags = await pb.list<TagRec>("tags", {
-		filter: `(name=${pbString(t)} || slug=${pbString(t.toLowerCase().replace(/\s+/g, "-"))})`,
-		perPage: 1,
-		skipTotal: true,
-	});
-	if (tags.items.length === 0) {
-		const loose = await pb.list<TagRec>("tags", { filter: `name~${pbString(t)}`, sort: "-usage_count", perPage: 20 });
-		tags = { ...loose, items: loose.items.filter((x) => x.name.toLowerCase() === t.toLowerCase()) };
-	}
-	const found = tags.items[0];
-	if (!found) return { tag, found: false, releases: [] };
-
+export async function releasesByTag(pb: PocketBase, tag: string, o: TagListOptions = {}) {
+	const { found } = await resolveTags(pb, [tag]);
+	if (!found[0]) return { tag, found: false, releases: [] };
+	const deep = deepHistoryFilter(o.deep_history);
+	const tagged = `tag_relations~${pbString(found[0].id)}`;
+	const paging = tagListPaging(o, 50, 200);
 	const albums = await pb.list<AlbumRec>("albums", {
-		filter: `tag_relations~${pbString(found.id)}`,
-		sort: "-play_count",
+		filter: deep ? `${tagged} && ${deep}` : tagged,
 		expand: "artist,tag_relations",
-		perPage: clamp(limit, 50, 200),
+		...paging.params,
 	});
-	return { tag: found.name, found: true, total: albums.totalItems, releases: albums.items.map(release) };
+	return { tag: found[0].name, found: true, ...paging.meta(albums), releases: albums.items.map(release) };
 }
 
 export const TRACK_SORTS = {
